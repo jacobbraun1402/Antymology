@@ -14,7 +14,7 @@ namespace Antymology.Terrain
         /// <summary>
         /// The prefab containing the ant.
         /// </summary>
-        public GameObject antPrefab;
+        public Ant antPrefab;
 
         /// <summary>
         /// The material used for eech block.
@@ -58,9 +58,9 @@ namespace Antymology.Terrain
 
             // Initialize a new 3D array of blocks with size of the number of chunks times the size of each chunk
             Blocks = new AbstractBlock[
-                ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter,
-                ConfigurationManager.Instance.World_Height * ConfigurationManager.Instance.Chunk_Diameter,
-                ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter];
+                ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter, //x
+                ConfigurationManager.Instance.World_Height * ConfigurationManager.Instance.Chunk_Diameter, // y
+                ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter]; // z
 
             // Initialize a new 3D array of chunks with size of the number of chunks
             Chunks = new Chunk[
@@ -88,7 +88,36 @@ namespace Antymology.Terrain
         /// </summary>
         private void GenerateAnts()
         {
-            throw new NotImplementedException();
+            for (int i = 0; i < ConfigurationManager.Instance.AntCount; i++)
+            {
+                int x_spawn, y_spawn, z_spawn;
+
+                x_spawn = UnityEngine.Random.Range(1, Blocks.GetLength(0)-1);
+                z_spawn = UnityEngine.Random.Range(1, Blocks.GetLength(2)-1);
+                y_spawn = FindFirstSolidBlock(x_spawn, z_spawn);
+
+                Ant a = Instantiate<Ant>(antPrefab, new Vector3(0f,0f,0f), Quaternion.Euler(new Vector3(0f,0f,0f)));
+
+                a.transform.SetParent(transform, false);
+                a.block_x = x_spawn;
+                a.block_y = y_spawn;
+                a.block_z = z_spawn;
+                a.transform.position = new Vector3(x_spawn, y_spawn-3.9f, z_spawn+1);
+            }
+        }
+
+        private int FindFirstSolidBlock(int x, int z)
+        {
+            int y;
+            for (y = Blocks.GetLength(1)-2; y >= 0; y--)
+            {
+                AbstractBlock b = Blocks[x,y,z];
+                if (b is not AirBlock)
+                {
+                    return y;
+                }
+            }
+            return y;
         }
 
         #endregion
