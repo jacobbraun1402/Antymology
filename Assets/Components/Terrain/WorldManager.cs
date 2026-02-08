@@ -132,6 +132,8 @@ namespace Antymology.Terrain
                 NewAnt.block_y = YSpawn;
                 NewAnt.block_z = ZSpawn;
 
+                NewAnt.id = i;
+
                 NewAnt.transform.SetParent(transform, false);
                 // Need to slightly adjust the Y and Z positioning so that ant is standing on top of correct block
                 NewAnt.transform.position = new Vector3(XSpawn, YSpawn-3.9f, ZSpawn+1);
@@ -173,6 +175,21 @@ namespace Antymology.Terrain
                 }
             }
             return MulchBlocks;
+        }
+
+        public List<Ant> OtherAntsAt(int CallerID, int WorldXCoordinate, int WorldYCoordinate, int WorldZCoordinate)
+        {
+            List<Ant> Result = new List<Ant>();
+            for (int i = 0; i < ConfigurationManager.Instance.AntCount; i++)
+            {
+                Ant a = Ants[i];
+                if ((a.id != CallerID) && a.block_x == WorldXCoordinate && a.block_y == WorldYCoordinate && a.block_z == WorldZCoordinate)
+                {
+                    Result.Add(a);
+                }
+            }
+
+            return Result;
         }
 
         #endregion
