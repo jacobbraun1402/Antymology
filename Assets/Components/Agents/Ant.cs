@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using Antymology.Terrain;
 using UnityEngine;
 
@@ -10,14 +11,21 @@ public class Ant : MonoBehaviour
     // private bool showDebug = false;
 
     public int block_x, block_y, block_z;
-    public int Health = 50;
+    public float Health = 50;
 
     public int id;
 
-    public const int MaxHealth = 100;
+    private bool DebugMessages = false;
+
+    public const float MaxHealth = 100;
 
     private float ProbMoving;
     private float ProbDigging;
+
+    // Chance of an ant healing another ant if its standing on the same spot
+    private float ProbHealing;
+
+    private float HealAmount = 20;
 
     private System.Random RNG;
 
@@ -27,7 +35,7 @@ public class Ant : MonoBehaviour
 
     public int HealthFromMulch = 10;
 
-    public AirBlock air = new AirBlock();
+    // public AirBlock air = new AirBlock();
 
     float TimeSinceLastUpdate;
 
@@ -37,6 +45,7 @@ public class Ant : MonoBehaviour
     {
         ProbMoving = .5f;
         ProbDigging = .5f;
+        ProbHealing = 0.1f;
 
         RNG = new System.Random();
 
@@ -44,7 +53,7 @@ public class Ant : MonoBehaviour
     }
 
     // Update is called once per frame
-    void Update()
+    void FixedUpdate()
     {
         TimeSinceLastUpdate += Time.deltaTime;
         if (TimeSinceLastUpdate >= TimeBetweenTicks)
@@ -56,7 +65,10 @@ public class Ant : MonoBehaviour
 
     void UpdateAnt()
     {
+        HealOthers();
+
         double MoveRoll = RNG.NextDouble();
+
         if (MoveRoll <= ProbMoving)
         {
             Move();
@@ -66,12 +78,40 @@ public class Ant : MonoBehaviour
             Dig();
         }
 
-        Health -= HealthDecayRate;
+        float DecayMultiplier = (GetBlock(block_x, block_y, block_z) is AcidicBlock) ? 2 : 1;
+
+        Health -= HealthDecayRate * DecayMultiplier;
 
         if (Health <= 0)
         {
-            Debug.Log($"Ant {id} died");
+            if (DebugMessages) Debug.Log($"Ant {id} died");
             Destroy(gameObject);
+        }
+    }
+
+    void HealOthers()
+    {
+        // check if other ants are at same location as this one. If yes, try and heal those ants
+        List<Ant> OtherAnts = WorldManager.Instance.OtherAntsAt(id, block_x, block_y, block_z);
+        if (OtherAnts.Count > 0)
+        {
+            double HealRoll = RNG.NextDouble();
+            if (HealRoll <= ProbHealing)
+            {
+                float HealthGiven = HealAmount / OtherAnts.Count;
+                if (DebugMessages)
+                {
+                    string Message = $"Ant {id} gave {HealthGiven} to ants " + String.Join(", ", OtherAnts.Select(A => A.id));
+                    Debug.Log(Message);
+                }
+
+                foreach (Ant A in OtherAnts)
+                {
+                    A.Health += HealAmount;
+                }
+
+                Health -= HealAmount;
+            }
         }
     }
 
@@ -82,17 +122,70 @@ public class Ant : MonoBehaviour
         if (ValidDestinations.Count > 0)
         {
             int[] Destination = ValidDestinations[RNG.Next(0, ValidDestinations.Count)];
-            // Debug.Log($"Ant {id} moved from ({block_x}, {block_y}, {block_z}) to ({Destination[0]}, {Destination[1]} {Destination[2]})");
+            if (DebugMessages) Debug.Log($"Ant {id} moved from ({block_x}, {block_y}, {block_z}) to ({Destination[0]}, {Destination[1]} {Destination[2]})");
 
             block_x = Destination[0]; 
             block_y = Destination[1]; 
             block_z = Destination[2];
 
             UpdatePosition(block_x, block_y, block_z);
+
+            // transform.RotateAround(transform.TransformPoint(transform.position), Vector3.up, UnityEngine.Random.Range(0f, 360f));
         }
 
 
         //NewAnt.transform.position = new Vector3(XSpawn, YSpawn-3.9f, ZSpawn+1);
+    }
+
+    // If ant is surrounded by columns of blocks that are two or more blocks higher than the ant in all 4 directions,
+    // Ant can't dig. This should help to prevent ants from digging themselves into holes they can't get out out
+    bool CheckIfCanDig()
+    {
+        AbstractBlock[,,] neighbours = GetNeighbouringBlocks();
+
+        AbstractBlock[] LeftColumns = new AbstractBlock[] {neighbours[0,3,1], neighbours[0,4,1]};
+        AbstractBlock[] RightColumns = new AbstractBlock[] {neighbours[2, 3, 1], neighbours[2, 4, 1]};
+        AbstractBlock[] BackwardColumns = new AbstractBlock[] {neighbours[1,3,0], neighbours[1,4,0]};
+        AbstractBlock[] ForwardColumns = new AbstractBlock[] {neighbours[1,3,2], neighbours[1,4,2]};
+
+        AbstractBlock[] AllColumnBlocks = (new AbstractBlock[] {neighbours[0, 3, 1], neighbours[0, 4, 1]})
+        .Concat(new AbstractBlock[] {neighbours[2, 3, 1], neighbours[2, 4, 1]})
+        .Concat(new AbstractBlock[] {neighbours[1, 3, 0], neighbours[1, 4, 0]})
+        .Concat(new AbstractBlock[] {neighbours[1, 3, 2], neighbours[1, 4, 2]}).ToArray();
+
+        // if (AllColumns.Sum(a => a is not AirBlock ? 1 : 0) == 8)
+        // {
+        //     return false;
+        // }
+
+        // return true;
+
+
+        return AllColumnBlocks.Sum(a => a is not AirBlock ? 1 : 0) != 8;
+    }
+
+    AbstractBlock[,,] GetNeighbouringBlocks()
+    {
+        AbstractBlock[,,] neighbours = new AbstractBlock[3,5,3];
+        for (int i = -1; i <= 1; i++)
+        {
+            for (int j = -2; j <= 2; j++)
+            {
+                for (int k = -1; k <= 1; k++)
+                {
+                    if ((i == 0) ^ (k == 0))
+                    {
+                        // world coordinates of block to query
+                        int xcord = block_x + i;
+                        int ycord = block_y + j;
+                        int zcord = block_z + k;
+                        AbstractBlock Block = GetBlock(xcord, ycord, zcord);
+                        neighbours[1+i, 2+j, 1+k] = Block;
+                    }
+                }
+            }
+        }
+        return neighbours;
     }
 
     List<int[]> GetValidDestinations()
@@ -105,22 +198,27 @@ public class Ant : MonoBehaviour
             {
                 for (int k = -1; k <= 1; k++)
                 {
-                    // don't set Blocks directly above or below ant as valid
-                    if (i == 0 && k == 0)
+                    // Set all blocks directly above, below, and diagonal to ant as invalid
+                    // if ((i == 0 && k == 0) || (Math.Abs(i) == 1 && Math.Abs(k) == 1))
+                    // {
+                    //     continue;
+                    // }
+                    // Only check if Ant can move forwards, backwards, left or right
+                    // When I had it so that ants could move diagonally, their movement patterns were kind of wonky
+                    if ((i == 0) ^ (k == 0))
                     {
-                        continue;
-                    }
-                    // world coordinates of block to query
-                    int xcord = block_x + i;
-                    int ycord = block_y + j;
-                    int zcord = block_z + k;
-                    AbstractBlock Block = GetBlock(xcord, ycord, zcord);
-                    neighbours[1+i, 2+j, 1+k] = Block;
+                        // world coordinates of block to query
+                        int xcord = block_x + i;
+                        int ycord = block_y + j;
+                        int zcord = block_z + k;
+                        AbstractBlock Block = GetBlock(xcord, ycord, zcord);
+                        neighbours[1+i, 2+j, 1+k] = Block;
 
-                    // If block is solid and block above it is air, then ant could move to it
-                    if ((Block is not AirBlock) && (GetBlock(xcord, ycord + 1, zcord) is AirBlock))
-                    {
-                        Result.Add(new int[] {xcord, ycord, zcord});
+                        // If block is solid and block above it is air, then ant could move to it
+                        if ((Block is not AirBlock) && (GetBlock(xcord, ycord + 1, zcord) is AirBlock))
+                        {
+                            Result.Add(new int[] {xcord, ycord, zcord});
+                        }
                     }
                 }
             }
@@ -154,15 +252,15 @@ public class Ant : MonoBehaviour
         AbstractBlock CurrentBlock = GetBlock(block_x, block_y, block_z);
         if ((CurrentBlock is not ContainerBlock) && (CurrentBlock is not AirBlock) && (WorldManager.Instance.OtherAntsAt(id, block_x, block_y, block_z).Count == 0))
         {
-            Debug.Log($"Ant {id} dug {CurrentBlock.GetType()} at ({block_x}, {block_y}, {block_z})");
+            if (DebugMessages) Debug.Log($"Ant {id} dug {CurrentBlock.GetType()} at ({block_x}, {block_y}, {block_z})");
 
             if (CurrentBlock is MulchBlock)
             {
                 Health = Math.Max(Health + 10, MaxHealth);
             }
             
-            WorldManager.Instance.SetBlock(block_x, block_y, block_z, air);
-            block_y -= 1;
+            WorldManager.Instance.SetBlock(block_x, block_y, block_z, new AirBlock());
+            block_y = WorldManager.Instance.FindFirstSolidBlock(block_x, block_z);
 
             UpdatePosition(block_x, block_y, block_z);
         }
@@ -179,8 +277,8 @@ public class Ant : MonoBehaviour
         transform.position = new Vector3(x, y - 3.9f, z + 1);
     }
 
-    void LateUpdate()
-    {
-      UpdatePosition(block_x, block_y, block_z);  
-    }
+    // void LateUpdate()
+    // {
+    //   UpdatePosition(block_x, block_y, block_z);  
+    // }
 }

@@ -50,5 +50,5 @@ public class ConfigurationManager : Singleton<ConfigurationManager>
     /// </summary>
     public int Conatiner_Sphere_Radius = 20;
 
-    public int AntCount = 1;
+    // public int NumAnts = 100;
 }

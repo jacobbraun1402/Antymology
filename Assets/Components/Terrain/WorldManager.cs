@@ -32,6 +32,8 @@ namespace Antymology.Terrain
         /// </summary>
         private AbstractBlock[,,] Blocks;
 
+        private int NumAnts = 100;
+
         /// <summary>
         /// Reference to the geometry data of the chunks.
         /// </summary>
@@ -71,7 +73,7 @@ namespace Antymology.Terrain
                 ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter]; // z
 
 
-            Ants = new Ant[ConfigurationManager.Instance.AntCount];
+            Ants = new Ant[NumAnts];
 
             // Initialize a new 3D array of chunks with size of the number of chunks
             Chunks = new Chunk[
@@ -104,7 +106,7 @@ namespace Antymology.Terrain
 
             // Do this just in case for some reason the number of ants we choose to generate is larger than
             // the possible spawn locations
-            int NumToGenerate = Math.Min(ConfigurationManager.Instance.AntCount, MulchBlocks.Count);
+            int NumToGenerate = Math.Min(Ants.GetLength(0), MulchBlocks.Count);
 
             // create an iterable of integers between 0 and the number of grass blocks
             // to represent the indices of the GrassBlock list
@@ -127,7 +129,7 @@ namespace Antymology.Terrain
                 ZSpawn = MulchCoord[2];
 
                 // Create instance of Ant and move it to be on top of mulch block
-                Ant NewAnt = Instantiate<Ant>(antPrefab, new Vector3(0f,0f,0f), Quaternion.Euler(new Vector3(0f,0f,0f)));
+                Ant NewAnt = Instantiate<Ant>(antPrefab, new Vector3(0f,0f,0f), Quaternion.Euler(new Vector3(0f, 0f, 0f)));
                 NewAnt.block_x = XSpawn;
                 NewAnt.block_y = YSpawn;
                 NewAnt.block_z = ZSpawn;
@@ -143,7 +145,7 @@ namespace Antymology.Terrain
         }
 
         // At a given x and z coordinate, find the y coordinate of the first block that is below an air block
-        private int FindFirstSolidBlock(int x, int z)
+        public int FindFirstSolidBlock(int x, int z)
         {
             int y;
             for (y = Blocks.GetLength(1)-2; y >= 0; y--)
@@ -180,7 +182,7 @@ namespace Antymology.Terrain
         public List<Ant> OtherAntsAt(int CallerID, int WorldXCoordinate, int WorldYCoordinate, int WorldZCoordinate)
         {
             List<Ant> Result = new List<Ant>();
-            for (int i = 0; i < ConfigurationManager.Instance.AntCount; i++)
+            for (int i = 0; i < NumAnts; i++)
             {
                 Ant a = Ants[i];
                 if ((a.id != CallerID) && a.block_x == WorldXCoordinate && a.block_y == WorldYCoordinate && a.block_z == WorldZCoordinate)
