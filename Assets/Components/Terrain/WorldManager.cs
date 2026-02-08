@@ -2,6 +2,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace Antymology.Terrain
@@ -20,6 +21,11 @@ namespace Antymology.Terrain
         /// The material used for eech block.
         /// </summary>
         public Material blockMaterial;
+
+        // how often the simulation should update
+        public float timeBetweenTicks;
+
+        private Ant[] Ants;
 
         /// <summary>
         /// The raw data of the underlying world structure.
@@ -56,11 +62,16 @@ namespace Antymology.Terrain
             // Generate new simplex noise generator
             SimplexNoise = new SimplexNoise(ConfigurationManager.Instance.Seed);
 
+            timeBetweenTicks = 1f;
+
             // Initialize a new 3D array of blocks with size of the number of chunks times the size of each chunk
             Blocks = new AbstractBlock[
                 ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter, //x
                 ConfigurationManager.Instance.World_Height * ConfigurationManager.Instance.Chunk_Diameter, // y
                 ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter]; // z
+
+
+            Ants = new Ant[ConfigurationManager.Instance.AntCount];
 
             // Initialize a new 3D array of chunks with size of the number of chunks
             Chunks = new Chunk[
@@ -84,28 +95,52 @@ namespace Antymology.Terrain
         }
 
         /// <summary>
-        /// TO BE IMPLEMENTED BY YOU
+        /// Generate ants to spawn on top of a random mulch block.
+        /// Number of ants to generate can be changed using the AntCount field in the ConfigurationManager
         /// </summary>
         private void GenerateAnts()
         {
-            for (int i = 0; i < ConfigurationManager.Instance.AntCount; i++)
+            List<int[]> MulchBlocks = GetSurfaceMulchBlocks();
+
+            // Do this just in case for some reason the number of ants we choose to generate is larger than
+            // the possible spawn locations
+            int NumToGenerate = Math.Min(ConfigurationManager.Instance.AntCount, MulchBlocks.Count);
+
+            // create an iterable of integers between 0 and the number of grass blocks
+            // to represent the indices of the GrassBlock list
+            List<int> Ids = Enumerable.Range(0, MulchBlocks.Count)
+                            .OrderBy(item => RNG.Next()).Take(NumToGenerate).ToList();
+                            // Use a series of random numbers to shuffle the indices, then take the first n
+                            // items of this list. This should give us spawn locations for the n ants we want to generate
+
+            for (int i = 0; i < NumToGenerate; i++)
             {
-                int x_spawn, y_spawn, z_spawn;
+                // Block coordinates where ant should spawn
+                int XSpawn, YSpawn, ZSpawn;
 
-                x_spawn = UnityEngine.Random.Range(1, Blocks.GetLength(0)-1);
-                z_spawn = UnityEngine.Random.Range(1, Blocks.GetLength(2)-1);
-                y_spawn = FindFirstSolidBlock(x_spawn, z_spawn);
+                // Get coordinates of ith randomly selected mulch block
+                int[] MulchCoord = MulchBlocks[Ids[i]];
 
-                Ant a = Instantiate<Ant>(antPrefab, new Vector3(0f,0f,0f), Quaternion.Euler(new Vector3(0f,0f,0f)));
+                // Set spawn coordinates to coordinates of block
+                XSpawn = MulchCoord[0];
+                YSpawn = MulchCoord[1];
+                ZSpawn = MulchCoord[2];
 
-                a.transform.SetParent(transform, false);
-                a.block_x = x_spawn;
-                a.block_y = y_spawn;
-                a.block_z = z_spawn;
-                a.transform.position = new Vector3(x_spawn, y_spawn-3.9f, z_spawn+1);
+                // Create instance of Ant and move it to be on top of mulch block
+                Ant NewAnt = Instantiate<Ant>(antPrefab, new Vector3(0f,0f,0f), Quaternion.Euler(new Vector3(0f,0f,0f)));
+                NewAnt.block_x = XSpawn;
+                NewAnt.block_y = YSpawn;
+                NewAnt.block_z = ZSpawn;
+
+                NewAnt.transform.SetParent(transform, false);
+                // Need to slightly adjust the Y and Z positioning so that ant is standing on top of correct block
+                NewAnt.transform.position = new Vector3(XSpawn, YSpawn-3.9f, ZSpawn+1);
+
+                Ants[i] = NewAnt;
             }
         }
 
+        // At a given x and z coordinate, find the y coordinate of the first block that is below an air block
         private int FindFirstSolidBlock(int x, int z)
         {
             int y;
@@ -118,6 +153,26 @@ namespace Antymology.Terrain
                 }
             }
             return y;
+        }
+
+        // finds all of the mulch blocks that have an air block directly above it
+        // Used to find possible spawn locations of the ants 
+        private List<int[]> GetSurfaceMulchBlocks()
+        {
+            List<int[]> MulchBlocks = new List<int[]>();
+            int j;
+            for (int i = 0; i < Blocks.GetLength(0); i++)
+            {
+                for (int k = 0; k < Blocks.GetLength(2); k++)
+                {
+                    j = FindFirstSolidBlock(i, k);
+                    if (Blocks[i,j,k] is MulchBlock)
+                    {
+                        MulchBlocks.Add(new int[]{i,j,k});
+                    }
+                }
+            }
+            return MulchBlocks;
         }
 
         #endregion
