@@ -15,7 +15,9 @@ namespace Antymology.Terrain
         /// <summary>
         /// The prefab containing the ant.
         /// </summary>
-        public Ant antPrefab;
+        public Ant AntPrefab;
+
+        public Queen QueenPrefab;
 
         /// <summary>
         /// The material used for eech block.
@@ -64,7 +66,7 @@ namespace Antymology.Terrain
             // Generate new simplex noise generator
             SimplexNoise = new SimplexNoise(ConfigurationManager.Instance.Seed);
 
-            timeBetweenTicks = 1f;
+            timeBetweenTicks = 0.5f;
 
             // Initialize a new 3D array of blocks with size of the number of chunks times the size of each chunk
             Blocks = new AbstractBlock[
@@ -129,7 +131,7 @@ namespace Antymology.Terrain
                 ZSpawn = MulchCoord[2];
 
                 // Create instance of Ant and move it to be on top of mulch block
-                Ant NewAnt = Instantiate<Ant>(antPrefab, new Vector3(0f,0f,0f), Quaternion.Euler(new Vector3(0f, 0f, 0f)));
+                Ant NewAnt = Instantiate<Ant>(AntPrefab, new Vector3(0f,0f,0f), Quaternion.Euler(new Vector3(0f, 0f, 0f)));
                 NewAnt.block_x = XSpawn;
                 NewAnt.block_y = YSpawn;
                 NewAnt.block_z = ZSpawn;
@@ -138,7 +140,7 @@ namespace Antymology.Terrain
 
                 NewAnt.transform.SetParent(transform, false);
                 // Need to slightly adjust the Y and Z positioning so that ant is standing on top of correct block
-                NewAnt.transform.position = new Vector3(XSpawn, YSpawn-3.9f, ZSpawn+1);
+                NewAnt.transform.position = new Vector3(XSpawn, YSpawn-1.2f, ZSpawn);
 
                 Ants[i] = NewAnt;
             }

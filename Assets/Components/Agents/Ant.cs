@@ -5,6 +5,7 @@ using System.Linq;
 using Antymology.Terrain;
 using UnityEngine;
 
+[RequireComponent(typeof(BoxCollider))]
 public class Ant : MonoBehaviour
 {
 
@@ -35,6 +36,10 @@ public class Ant : MonoBehaviour
 
     public int HealthFromMulch = 10;
 
+    public float Angle;
+
+    private bool UpdateNeeded;
+
     // public AirBlock air = new AirBlock();
 
     float TimeSinceLastUpdate;
@@ -50,10 +55,11 @@ public class Ant : MonoBehaviour
         RNG = new System.Random();
 
         TimeBetweenTicks = WorldManager.Instance.timeBetweenTicks;
+        UpdateNeeded = false;
     }
 
     // Update is called once per frame
-    void FixedUpdate()
+    void Update()
     {
         TimeSinceLastUpdate += Time.deltaTime;
         if (TimeSinceLastUpdate >= TimeBetweenTicks)
@@ -87,6 +93,8 @@ public class Ant : MonoBehaviour
             if (DebugMessages) Debug.Log($"Ant {id} died");
             Destroy(gameObject);
         }
+
+        // SetYRotation(UnityEngine.Random.Range(0f, 360f));
     }
 
     void HealOthers()
@@ -121,6 +129,7 @@ public class Ant : MonoBehaviour
 
         if (ValidDestinations.Count > 0)
         {
+
             int[] Destination = ValidDestinations[RNG.Next(0, ValidDestinations.Count)];
             if (DebugMessages) Debug.Log($"Ant {id} moved from ({block_x}, {block_y}, {block_z}) to ({Destination[0]}, {Destination[1]} {Destination[2]})");
 
@@ -128,9 +137,9 @@ public class Ant : MonoBehaviour
             block_y = Destination[1]; 
             block_z = Destination[2];
 
-            UpdatePosition(block_x, block_y, block_z);
-
-            // transform.RotateAround(transform.TransformPoint(transform.position), Vector3.up, UnityEngine.Random.Range(0f, 360f));
+            // UpdatePosition(block_x, block_y, block_z);
+            Angle = UnityEngine.Random.Range(0f, 360f);
+            UpdateNeeded = true;
         }
 
 
@@ -190,7 +199,7 @@ public class Ant : MonoBehaviour
 
     List<int[]> GetValidDestinations()
     {
-        AbstractBlock[,,] neighbours = new AbstractBlock[3,5,3];
+        // AbstractBlock[,,] neighbours = new AbstractBlock[3,5,3];
         List<int[]> Result = new();
         for (int i = -1; i <= 1; i++)
         {
@@ -212,7 +221,7 @@ public class Ant : MonoBehaviour
                         int ycord = block_y + j;
                         int zcord = block_z + k;
                         AbstractBlock Block = GetBlock(xcord, ycord, zcord);
-                        neighbours[1+i, 2+j, 1+k] = Block;
+                        // neighbours[1+i, 2+j, 1+k] = Block;
 
                         // If block is solid and block above it is air, then ant could move to it
                         if ((Block is not AirBlock) && (GetBlock(xcord, ycord + 1, zcord) is AirBlock))
@@ -262,7 +271,8 @@ public class Ant : MonoBehaviour
             WorldManager.Instance.SetBlock(block_x, block_y, block_z, new AirBlock());
             block_y = WorldManager.Instance.FindFirstSolidBlock(block_x, block_z);
 
-            UpdatePosition(block_x, block_y, block_z);
+            Angle = UnityEngine.Random.Range(0f, 360f);
+            UpdateNeeded = true;
         }
     }
 
@@ -274,11 +284,25 @@ public class Ant : MonoBehaviour
 
     void UpdatePosition(int x,int y,int z)
     {
-        transform.position = new Vector3(x, y - 3.9f, z + 1);
+        // transform.position = new Vector3(x, y - 3.9f, z + 1);
+        transform.position = new Vector3(x, y-1.2f, z);
     }
 
-    // void LateUpdate()
-    // {
-    //   UpdatePosition(block_x, block_y, block_z);  
-    // }
+    void LateUpdate()
+    {
+        if (UpdateNeeded)
+        {
+            UpdatePosition(block_x, block_y, block_z);
+            SetYRotation(Angle);
+            UpdateNeeded = false;
+        }
+
+    }
+
+    void SetYRotation(float angle)
+    {
+        BoxCollider collider = GetComponent<BoxCollider>();
+        Vector3 center = transform.TransformPoint(collider.center);
+        transform.RotateAround(center, Vector3.up, angle);
+    }
 }
