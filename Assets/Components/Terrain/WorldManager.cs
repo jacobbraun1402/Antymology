@@ -15,9 +15,9 @@ namespace Antymology.Terrain
         /// <summary>
         /// The prefab containing the ant.
         /// </summary>
-        public Ant AntPrefab;
+        public Ant antPrefab;
 
-        public Queen QueenPrefab;
+        public Queen queenPrefab;
 
         /// <summary>
         /// The material used for eech block.
@@ -27,7 +27,7 @@ namespace Antymology.Terrain
         // how often the simulation should update
         public float timeBetweenTicks;
 
-        private Ant[] Ants;
+        private AbstractAnt[] Ants;
 
         /// <summary>
         /// The raw data of the underlying world structure.
@@ -74,8 +74,8 @@ namespace Antymology.Terrain
                 ConfigurationManager.Instance.World_Height * ConfigurationManager.Instance.Chunk_Diameter, // y
                 ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter]; // z
 
-
-            Ants = new Ant[NumAnts];
+            // Create list storing all ants and the queen
+            Ants = new Ant[NumAnts+1];
 
             // Initialize a new 3D array of chunks with size of the number of chunks
             Chunks = new Chunk[
@@ -131,19 +131,39 @@ namespace Antymology.Terrain
                 ZSpawn = MulchCoord[2];
 
                 // Create instance of Ant and move it to be on top of mulch block
-                Ant NewAnt = Instantiate<Ant>(AntPrefab, new Vector3(0f,0f,0f), Quaternion.Euler(new Vector3(0f, 0f, 0f)));
+                Ant NewAnt = Instantiate<Ant>(antPrefab, transform, false);
                 NewAnt.block_x = XSpawn;
                 NewAnt.block_y = YSpawn;
                 NewAnt.block_z = ZSpawn;
 
                 NewAnt.id = i;
 
-                NewAnt.transform.SetParent(transform, false);
+                // NewAnt.transform.SetParent(transform, false);
                 // Need to slightly adjust the Y and Z positioning so that ant is standing on top of correct block
                 NewAnt.transform.position = new Vector3(XSpawn, YSpawn-1.2f, ZSpawn);
 
                 Ants[i] = NewAnt;
             }
+
+            int QueenX, QueenY, QueenZ;
+
+            Queen NewQueen = Instantiate<Queen>(queenPrefab, transform, false);
+
+            // Spawn queen at about the center of the map
+            QueenX = Mathf.FloorToInt(Blocks.GetLength(0) / 2);
+            QueenZ = Mathf.FloorToInt(Blocks.GetLength(2) / 2);
+
+            QueenY = FindFirstSolidBlock(QueenX, QueenZ);
+
+            NewQueen.block_x = QueenX;
+            NewQueen.block_y = QueenY;
+            NewQueen.block_z = QueenZ;
+
+            NewQueen.transform.position = new Vector3(QueenX, QueenY-1.2f, QueenZ);
+
+            NewQueen.id = NumToGenerate;
+
+            Ants[NumToGenerate] = NewQueen;
         }
 
         // At a given x and z coordinate, find the y coordinate of the first block that is below an air block
@@ -181,12 +201,12 @@ namespace Antymology.Terrain
             return MulchBlocks;
         }
 
-        public List<Ant> OtherAntsAt(int CallerID, int WorldXCoordinate, int WorldYCoordinate, int WorldZCoordinate)
+        public List<AbstractAnt> OtherAntsAt(int CallerID, int WorldXCoordinate, int WorldYCoordinate, int WorldZCoordinate)
         {
-            List<Ant> Result = new List<Ant>();
+            List<AbstractAnt> Result = new();
             for (int i = 0; i < NumAnts; i++)
             {
-                Ant a = Ants[i];
+                AbstractAnt a = Ants[i];
                 if ((a.id != CallerID) && a.block_x == WorldXCoordinate && a.block_y == WorldYCoordinate && a.block_z == WorldZCoordinate)
                 {
                     Result.Add(a);
