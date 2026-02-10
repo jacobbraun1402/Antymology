@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Linq.Expressions;
 using UnityEngine;
 
 public abstract class AbstractBlock
@@ -29,4 +30,13 @@ public abstract class AbstractBlock
     /// The world z coordinate of this block.
     /// </summary>
     public int worldZCoordinate;
+    public AbstractBlock(){}
+
+    public AbstractBlock(int x, int y, int z)
+    {
+        worldXCoordinate = x;
+        worldYCoordinate = y;
+        worldZCoordinate = z;
+    }
+    
 }

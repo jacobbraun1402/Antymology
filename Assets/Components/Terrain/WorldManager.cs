@@ -27,7 +27,9 @@ namespace Antymology.Terrain
         // how often the simulation should update
         public float timeBetweenTicks;
 
-        private AbstractAnt[] Ants;
+        public float TimeSinceLastUpdate;
+
+        public AbstractAnt[] Ants;
 
         /// <summary>
         /// The raw data of the underlying world structure.
@@ -108,16 +110,16 @@ namespace Antymology.Terrain
 
             // Do this just in case for some reason the number of ants we choose to generate is larger than
             // the possible spawn locations
-            int NumToGenerate = Math.Min(Ants.GetLength(0), MulchBlocks.Count);
+            // int NumToGenerate = Math.Min(NumAnts, MulchBlocks.Count);
 
             // create an iterable of integers between 0 and the number of grass blocks
             // to represent the indices of the GrassBlock list
             List<int> Ids = Enumerable.Range(0, MulchBlocks.Count)
-                            .OrderBy(item => RNG.Next()).Take(NumToGenerate).ToList();
+                            .OrderBy(item => RNG.Next()).Take(NumAnts).ToList();
                             // Use a series of random numbers to shuffle the indices, then take the first n
                             // items of this list. This should give us spawn locations for the n ants we want to generate
 
-            for (int i = 0; i < NumToGenerate; i++)
+            for (int i = 0; i < NumAnts; i++)
             {
                 // Block coordinates where ant should spawn
                 int XSpawn, YSpawn, ZSpawn;
@@ -161,9 +163,9 @@ namespace Antymology.Terrain
 
             NewQueen.transform.position = new Vector3(QueenX, QueenY-1.2f, QueenZ);
 
-            NewQueen.id = NumToGenerate;
+            NewQueen.id = NumAnts;
 
-            Ants[NumToGenerate] = NewQueen;
+            Ants[NumAnts] = NewQueen;
         }
 
         // At a given x and z coordinate, find the y coordinate of the first block that is below an air block
@@ -204,7 +206,7 @@ namespace Antymology.Terrain
         public List<AbstractAnt> OtherAntsAt(int CallerID, int WorldXCoordinate, int WorldYCoordinate, int WorldZCoordinate)
         {
             List<AbstractAnt> Result = new();
-            for (int i = 0; i < NumAnts; i++)
+            for (int i = 0; i < Ants.Length; i++)
             {
                 AbstractAnt a = Ants[i];
                 if ((a.id != CallerID) && a.block_x == WorldXCoordinate && a.block_y == WorldYCoordinate && a.block_z == WorldZCoordinate)
@@ -281,9 +283,9 @@ namespace Antymology.Terrain
                 WorldXCoordinate < 0 ||
                 WorldYCoordinate < 0 ||
                 WorldZCoordinate < 0 ||
-                WorldXCoordinate > Blocks.GetLength(0) ||
-                WorldYCoordinate > Blocks.GetLength(1) ||
-                WorldZCoordinate > Blocks.GetLength(2)
+                WorldXCoordinate >= Blocks.GetLength(0) ||
+                WorldYCoordinate >= Blocks.GetLength(1) ||
+                WorldZCoordinate >= Blocks.GetLength(2)
             )
             {
                 Debug.Log("Attempted to set a block which didn't exist");
@@ -392,7 +394,7 @@ namespace Antymology.Terrain
                         }
                         else
                         {
-                            Blocks[x, y, z] = new AirBlock();
+                            Blocks[x, y, z] = new AirBlock(x, y, z);
                         }
                         if
                         (
@@ -520,7 +522,7 @@ namespace Antymology.Terrain
 
             if (updateZ - 1 >= 0)
                 Chunks[updateX, updateY, updateZ - 1].updateNeeded = true;
-            if (updateX + 1 < Chunks.GetLength(2))
+            if (updateZ + 1 < Chunks.GetLength(2))
                 Chunks[updateX, updateY, updateZ + 1].updateNeeded = true;
         }
 
@@ -560,5 +562,79 @@ namespace Antymology.Terrain
         #endregion
 
         #endregion
+        void Update()
+        {
+            TimeSinceLastUpdate += Time.deltaTime;
+            if (TimeSinceLastUpdate >= timeBetweenTicks)
+            {
+                TimeSinceLastUpdate -= timeBetweenTicks;
+                DiffusePheromones();
+                // EvaporatePheromones();
+            } 
+        }
+
+        void DiffusePheromones()
+        {
+            for (int x = 0; x < Blocks.GetLength(0); x++)
+            {
+                for (int y = 0; y < Blocks.GetLength(1); y++)
+                {
+                    for (int z = 0; z < Blocks.GetLength(2); z++)
+                    {
+                        AbstractBlock block = GetBlock(x, y, z);
+                        if (block is AirBlock air)
+                        {
+                            if (air.GetPheromones() > 0)
+                            {
+                                List<AirBlock> neighbours = GetNeighbouringAirBlocks(x, y, z);
+                                air.Diffuse(neighbours);
+                                air.Evaporate();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // void EvaporatePheromones()
+        // {
+        //     for (int x = 0; x < Blocks.GetLength(0); x++)
+        //     {
+        //         for (int y = 0; y < Blocks.GetLength(1); y++)
+        //         {
+        //             for (int z = 0; z < Blocks.GetLength(2); z++)
+        //             {
+        //                 AbstractBlock block = GetBlock(x, y, z);
+        //                 if (block is AirBlock air)
+        //                 {
+                            
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
+
+        List<AirBlock> GetNeighbouringAirBlocks(int x, int y, int z)
+        {
+            List<AirBlock> Result = new();
+            for (int i = -1; i <= 1; i++)
+            {
+                for (int j = -1; j <= 1; j++)
+                {
+                    for (int k = -1; k <= 1; k++)
+                    {
+                        if ((i+j+k) != 0)
+                        {
+                            AbstractBlock Neighbour = GetBlock(x+i, y+j, z+k);
+                            if (Neighbour is AirBlock block)
+                            {
+                                Result.Add(block);
+                            }
+                        }
+                    }
+                }
+            }
+            return Result;
+        }
     }
 }

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Antymology.Terrain;
+using System.Linq.Expressions;
 
 
 
@@ -13,9 +14,12 @@ public class Queen : Ant
 
     void Start()
     {
-        MaxHealth = 600;
-        Health = 600;
-        BuildCost = MaxHealth / 3;
+        MaxHealth = 100;
+        Health = 100;
+        BuildCost = 33;
+
+        // Makes Queen only move sometimes so that other ants can catch up to her
+        ProbMoving = 0.25f;
     }
 
     public override void UpdateAnt()
@@ -28,11 +32,15 @@ public class Queen : Ant
             }
             else
             {
-                Move();
+                if (RNG.NextDouble() <= ProbMoving) Move();
             }
 
             float DecayMultiplier = (GetBlock(block_x, block_y, block_z) is AcidicBlock) ? 2 : 1;
-            Health -= HealthDecayRate * DecayMultiplier;
+            Health = Mathf.Max(Health - (HealthDecayRate * DecayMultiplier), 0);
+        }
+        else
+        {
+            DepositPheromones(10);
         }
     }
 
@@ -55,8 +63,8 @@ public class Queen : Ant
             UpdateNeeded = true;
         }
 
-
-        //NewAnt.transform.position = new Vector3(XSpawn, YSpawn-3.9f, ZSpawn+1);
+        // Queen deposits her own pheromone into the airblock above block she's standing on
+        DepositPheromones(50);
     }
 
     void BuildNest()
@@ -82,5 +90,24 @@ public class Queen : Ant
             A.UpdateNeeded = true;
         }
 
+        // Queen will deposit extra pheromones if she builds a nest block this tick
+        DepositPheromones(500);
+        Move();
+    }
+
+    void DepositPheromones(float amount)
+    {
+        AbstractBlock B = GetBlock(block_x, block_y+1, block_z);
+        try
+        {
+            AirBlock air = (AirBlock) B;
+            air.AddPheromones(amount);
+        }
+        catch (Exception)
+        {
+            block_y += 1;
+            UpdateNeeded = true;
+            DepositPheromones(amount);
+        }
     }
 }

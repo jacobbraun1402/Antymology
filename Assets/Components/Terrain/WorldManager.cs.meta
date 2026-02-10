@@ -8,7 +8,7 @@ MonoImporter:
       type: 3}
   - queenPrefab: {fileID: 384656862167154133, guid: 2d012d9ae3c134e6e953376e9cf81e00,
       type: 3}
-  - blockMaterial: {instanceID: 0}
+  - blockMaterial: {fileID: 2100000, guid: 4db9d8fce1a69b74f81daf1375c9ed88, type: 2}
   executionOrder: 0
   icon: {instanceID: 0}
   userData: 
