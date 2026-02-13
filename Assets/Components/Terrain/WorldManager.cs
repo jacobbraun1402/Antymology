@@ -53,6 +53,8 @@ namespace Antymology.Terrain
         /// </summary>
         private SimplexNoise SimplexNoise;
 
+        // public HashSet<AirBlock> BlocksWithPheromone;
+
         #endregion
 
         #region Initialization
@@ -79,6 +81,8 @@ namespace Antymology.Terrain
             // Create list storing all ants and the queen
             Ants = new Ant[NumAnts+1];
 
+            // BlocksWithPheromone = new();
+
             // Initialize a new 3D array of chunks with size of the number of chunks
             Chunks = new Chunk[
                 ConfigurationManager.Instance.World_Diameter,
@@ -97,14 +101,49 @@ namespace Antymology.Terrain
             Camera.main.transform.position = new Vector3(0 / 2, Blocks.GetLength(1), 0);
             Camera.main.transform.LookAt(new Vector3(Blocks.GetLength(0), 0, Blocks.GetLength(2)));
 
-            GenerateAnts();
+            List<List<double[,]>> ModelWeights = GenerateRandomWeights();
+            GenerateAnts(ModelWeights);
         }
 
+        private List<List<double[,]>> GenerateRandomWeights()
+        {
+            List<List<double[,]>> AllWeights = new();
+            for (int i = 0; i < NumAnts; i++)
+            {
+                List<double[,]> weightsForModel = new();
+
+                double[,] FirstLayerWeights = new double[16,10];
+                for (int j = 0; j < FirstLayerWeights.GetLength(0); j++)
+                {
+                    for (int k = 0; k < FirstLayerWeights.GetLength(1); k++)
+                    {
+                        FirstLayerWeights[i,j] = RNG.NextDouble();
+                    }
+                }
+
+                weightsForModel.Add(FirstLayerWeights);
+                
+                double[,] secondlayerweights = new double[5,16];
+                for (int j = 0; j < secondlayerweights.GetLength(0); j++)
+                {
+                    for (int k = 0; k < secondlayerweights.GetLength(1); k++)
+                    {
+                        secondlayerweights[i,j] = RNG.NextDouble();
+                    }
+                }
+
+                weightsForModel.Add(secondlayerweights);
+
+                AllWeights.Add(weightsForModel);
+            }
+
+            return AllWeights;
+        }
         /// <summary>
         /// Generate ants to spawn on top of a random mulch block.
         /// Number of ants to generate can be changed using the AntCount field in the ConfigurationManager
         /// </summary>
-        private void GenerateAnts()
+        private void GenerateAnts(List<List<double[,]>> ModelWeights)
         {
             List<int[]> MulchBlocks = GetSurfaceMulchBlocks();
 
@@ -145,6 +184,12 @@ namespace Antymology.Terrain
                 NewAnt.transform.position = new Vector3(XSpawn, YSpawn-1.2f, ZSpawn);
 
                 Ants[i] = NewAnt;
+
+                DecisionModel AntModel = new(10, 5);
+
+                List<double[,]> weights = ModelWeights[i];
+                double[,] firstLayerWeights = weights[0];
+                double[,] secondLayerWeights = weights[]
             }
 
             int QueenX, QueenY, QueenZ;
@@ -562,7 +607,7 @@ namespace Antymology.Terrain
         #endregion
 
         #endregion
-        void Update()
+        void LateUpdate()
         {
             TimeSinceLastUpdate += Time.deltaTime;
             if (TimeSinceLastUpdate >= timeBetweenTicks)
@@ -595,6 +640,22 @@ namespace Antymology.Terrain
                 }
             }
         }
+
+        // void DiffusePheromones()
+        // {
+        //     HashSet<AirBlock> ToUpdate = new HashSet<AirBlock>(BlocksWithPheromone);
+        //     foreach (AirBlock B in ToUpdate)
+        //     {
+        //         int x = B.worldXCoordinate, y = B.worldYCoordinate, z=B.worldZCoordinate;
+        //         if (x >= 0 && y >= 0 && z >= 0)
+        //         {
+        //             List<AirBlock> neighbours = GetNeighbouringAirBlocks(x, y, z);
+        //             B.Diffuse(neighbours);
+        //             B.Evaporate();
+        //         }
+                
+        //     }
+        // }
 
         // void EvaporatePheromones()
         // {

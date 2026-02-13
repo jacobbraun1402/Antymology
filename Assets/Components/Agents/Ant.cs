@@ -27,6 +27,8 @@ public class Ant : AbstractAnt
     // Chance of an ant healing another ant if its standing on the same spot
     private float ProbHealing;
 
+    public float HealthGivenToQueen;
+
     private float HealAmount = 10;
 
     // private System.Random RNG;
@@ -36,6 +38,8 @@ public class Ant : AbstractAnt
     // public int HealthDecayRate = 2;
 
     public int HealthFromMulch = 10;
+
+    public DecisionModel Model;
 
     // public float Angle;
 
@@ -57,6 +61,7 @@ public class Ant : AbstractAnt
 
         Health = 100;
 
+        HealthGivenToQueen = 0;
 
 
 

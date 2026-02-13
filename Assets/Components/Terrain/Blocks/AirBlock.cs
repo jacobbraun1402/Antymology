@@ -88,6 +88,7 @@ namespace Antymology.Terrain
             if (phermoneDeposits <= 1)
             {
                 phermoneDeposits = 0;
+                // WorldManager.Instance.BlocksWithPheromone.Remove(this);
             }
         }
 
