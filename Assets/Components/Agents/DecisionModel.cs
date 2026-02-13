@@ -6,12 +6,12 @@ using System.Collections.Generic;
 // Current Block they are standing on
 // If other ants are on the same spot
 // If queen on same spot
-// Average strength of the two blocks with the highest pheromone concentrations
+// amount of pheromones on block with highest pheromone concentration
 // Current health
 
 
 // Possible actions:
-// Move towards Queen Pheromones
+// Move towards Pheromones
 // Move away from pheromones
 // Heal other ants
 // Dig

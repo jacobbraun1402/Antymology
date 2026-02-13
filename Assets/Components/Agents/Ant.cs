@@ -24,9 +24,6 @@ public class Ant : AbstractAnt
     // private float ProbMoving;
     // private float ProbDigging;
 
-    // Chance of an ant healing another ant if its standing on the same spot
-    private float ProbHealing;
-
     public float HealthGivenToQueen;
 
     private float HealAmount = 10;
@@ -53,10 +50,6 @@ public class Ant : AbstractAnt
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        ProbMoving = .9f;
-        // ProbDigging = .5f;
-        ProbHealing = 0.1f;
-
         MaxHealth = 100;
 
         Health = 100;
@@ -82,9 +75,36 @@ public class Ant : AbstractAnt
     //     }
     // }
 
+    // public override void UpdateAnt()
+    // {
+    //     HealOthers();
+
+    //     if (Health <= 0)
+    //     {
+    //         if (DebugMessages) Debug.Log($"Ant {id} died");
+    //         Destroy(gameObject);
+    //     }
+
+    //     double MoveRoll = RNG.NextDouble();
+
+    //     if (MoveRoll <= ProbMoving)
+    //     {
+    //         Move();
+    //     }
+    //     else
+    //     {
+    //         Dig();
+    //     }
+
+    //     float DecayMultiplier = (GetBlock(block_x, block_y, block_z) is AcidicBlock) ? 2 : 1;
+
+    //     Health = Mathf.Max(Health - (HealthDecayRate * DecayMultiplier), 0);
+
+    //     // SetYRotation(UnityEngine.Random.Range(0f, 360f));
+    // }
     public override void UpdateAnt()
     {
-        HealOthers();
+        // HealOthers();
 
         if (Health <= 0)
         {
@@ -92,56 +112,223 @@ public class Ant : AbstractAnt
             Destroy(gameObject);
         }
 
-        double MoveRoll = RNG.NextDouble();
+        // double MoveRoll = RNG.NextDouble();
 
-        if (MoveRoll <= ProbMoving)
+        // if (MoveRoll <= ProbMoving)
+        // {
+        //     Move();
+        // }
+        // else
+        // {
+        //     Dig();
+        // }
+
+        // float DecayMultiplier = (GetBlock(block_x, block_y, block_z) is AcidicBlock) ? 2 : 1;
+
+        // Health = Mathf.Max(Health - (HealthDecayRate * DecayMultiplier), 0);
+
+        // SetYRotation(UnityEngine.Random.Range(0f, 360f));
+
+        double[] modelInputs = GetModelInputs();
+        double[] outputs = Model.MakeDecision(modelInputs);
+        
+        // each element in outputs maps to what decision the ant should take. These are:
+        // 0: Move towards Pheromones
+        // 1: move randomly (explore the map)
+        // 2: heal other ants
+        // 3: dig
+
+        double maxProb = outputs.Max();
+        
+        if (maxProb == outputs[0])
         {
             Move();
         }
-        else
+        else if (maxProb == outputs[1])
+        {
+            RandomMove();
+        }
+        else if ((maxProb == outputs[2]) && (Health >= HealAmount))
+        {
+            HealOthers();
+        }
+        else if (maxProb == outputs[3])
         {
             Dig();
         }
 
         float DecayMultiplier = (GetBlock(block_x, block_y, block_z) is AcidicBlock) ? 2 : 1;
-
         Health = Mathf.Max(Health - (HealthDecayRate * DecayMultiplier), 0);
+        
+    }
 
-        // SetYRotation(UnityEngine.Random.Range(0f, 360f));
+    void MoveToPheromones()
+    {
+        Dictionary<int[], double> DestinationPheromones = GetDestinationPheromones(GetValidDestinations());
+
+        if (DestinationPheromones.Keys.Count > 0) 
+        {
+            int[] maxCoordinates = new int[3];
+            double maxValue = 0;
+
+            foreach (var coord in DestinationPheromones.Keys)
+            {
+                if (DestinationPheromones[coord] >= maxValue)
+                {
+                    maxCoordinates = coord;
+                    maxValue = DestinationPheromones[coord];
+                }
+            }
+
+            block_x = maxCoordinates[0]; 
+            block_y = maxCoordinates[1]; 
+            block_z = maxCoordinates[2];
+
+            // Debug.Log($"Ant {id} moved from ({block_x}, {block_y}, {block_z}) to ({maxCoordinates[0]}, {maxCoordinates[1]} {maxCoordinates[2]})");
+
+            // UpdatePosition(block_x, block_y, block_z);
+            Angle = UnityEngine.Random.Range(0f, 360f);
+            UpdateNeeded = true;
+        }
+    }
+
+    void RandomMove()
+    {
+        List<int[]> ValidDestinations = GetValidDestinations();
+        if (ValidDestinations.Count > 0)
+        {
+            // Dictionary<int[], double> DestinationPheromones = GetDestinationPheromones(ValidDestinations);
+
+            int[] Destination = ValidDestinations[UnityEngine.Random.Range(0, ValidDestinations.Count)];
+            // int[] Destination = ValidDestinations[RNG.Next(0, ValidDestinations.Count)];
+            // Debug.Log($"Ant {id} moved from ({block_x}, {block_y}, {block_z}) to ({Destination[0]}, {Destination[1]} {Destination[2]})");
+
+            block_x = Destination[0]; 
+            block_y = Destination[1]; 
+            block_z = Destination[2];
+
+            // UpdatePosition(block_x, block_y, block_z);
+            Angle = UnityEngine.Random.Range(0f, 360f);
+            UpdateNeeded = true;
+
+            // Worker ants deposit a bit of pheromones whenever they move into the airblock above where they're standing
+            // AirBlock B = (AirBlock) GetBlock(block_x, block_y+1, block_z);
+            // B.AddPheromones('F', 1);
+
+
+        }
+    }
+
+    double[] GetModelInputs()
+    {
+        double[] inputs = new double[10];
+        Array.Fill(inputs, 0);
+
+        // what's stored at each index:
+        // 0: standing on acidic block? (1 if yes, 0 if no)
+        // 1: standing on container block?
+        // 2: standing on grass block?
+        // 3: standing on mulch block?
+        // 4: standing on nest block?
+        // 5: standing on stone block?
+        // 6: Other ants on same block?
+        // 7: Queen on same block?
+        // 8: Average Pheromone concentration of blocks surrounding ant
+        // 9: current health
+
+        AbstractBlock CurrentBlock = GetBlock(block_x, block_y, block_z);
+        
+        if (CurrentBlock is AcidicBlock)
+        {
+            inputs[0] = 1;
+        }
+        else if (CurrentBlock is ContainerBlock)
+        {
+            inputs[1] = 1;
+        }
+        else if (CurrentBlock is GrassBlock)
+        {
+            inputs[2] = 1;
+        }
+        else if (CurrentBlock is MulchBlock)
+        {
+            inputs[3] = 1;
+        }
+        else if (CurrentBlock is NestBlock)
+        {
+            inputs[4] = 1;
+        }
+        else if (CurrentBlock is StoneBlock)
+        {
+            inputs[5] = 1;
+        }
+        
+        List<AbstractAnt> OtherAnts = WorldManager.Instance.OtherAntsAt(id, block_x, block_y, block_z);
+        inputs[6] = OtherAnts.Count > 0 ? 1 : 0;
+
+        double QueenHere = 0;
+        foreach (AbstractAnt ant in OtherAnts)
+        {
+            if (ant is Queen Q)
+            {
+                // Debug.Log($"Ant {id} is by the queen");
+                QueenHere = 1;
+                break;
+            }
+        }
+
+        inputs[7] = QueenHere;
+
+        Dictionary<int[],double> DestinationPheromones = GetDestinationPheromones(GetValidDestinations());
+
+        if (DestinationPheromones.Count > 0)
+        {
+            inputs[8] = GetDestinationPheromones(GetValidDestinations()).Values.Average();
+        }
+        else inputs[8] = 0;
+        
+        inputs[9] = Health;
+
+        return inputs;
     }
 
     void HealOthers()
     {
         // // Check to see if there are other ants at same location
         List<AbstractAnt> OtherAnts = WorldManager.Instance.OtherAntsAt(id, block_x, block_y, block_z);
-        // // If Ant is on same spot as the queen, then they must heal
-        // if (OtherAnts.Count(A => A is Queen) >= 1)
-        // {
-        //     Queen queen = OtherAnts.Where(A => A is Queen).Cast<Queen>().ToArray()[0];
-        //     queen.Health = Mathf.Min(queen.MaxHealth, queen.Health + HealAmount);
-        //     Health -= HealAmount;
-        //     Debug.Log($"Ant {id} healed the queen");
-        // }
-        // check if other ants are at same location as this one. If yes, try and heal those ants
-        if (OtherAnts.Count > 0)
+        // // If Ant is on same spot as the queen, then they must heal only her
+        int QueenID = WorldManager.Instance.NumAnts;
+
+        bool QueenHere = false;
+
+        foreach (AbstractAnt A in OtherAnts)
         {
-            double HealRoll = RNG.NextDouble();
-            if (HealRoll <= ProbHealing)
+            if (A is Queen Q)
             {
-                float HealthGiven = HealAmount / OtherAnts.Count;
-                // if (DebugMessages)
-                // {
-                    string Message = $"Ant {id} gave {HealthGiven} to ants " + String.Join(", ", OtherAnts.Select(A => A.id));
-                    Debug.Log(Message);
-                // }
-
-                foreach (Ant A in OtherAnts.Cast<Ant>())
-                {
-                    A.Health = Mathf.Min(MaxHealth, A.Health + HealAmount);
-                }
-
-                Health = Mathf.Max(0, Health - HealAmount);
+                Debug.Log($"Ant {id} healed the queen");
+                HealthGivenToQueen += HealAmount;
+                Q.Health = Mathf.Min(MaxHealth, Q.Health + HealAmount);
+                Health = Mathf.Max(0, Health-HealAmount);
+                QueenHere = true;
             }
+        }
+
+        // check if other ants are at same location as this one. If yes, try and heal those ants
+        if ((OtherAnts.Count > 0) && !QueenHere)
+        {
+            float HealthGiven = HealAmount / OtherAnts.Count;
+            // if (DebugMessages)
+            // {
+                // string Message = $"Ant {id} gave {HealthGiven} to ants " + String.Join(", ", OtherAnts.Select(A => A.id));
+                // Debug.Log(Message);
+            // }
+
+            foreach (AbstractAnt A in OtherAnts)
+            {
+                A.Health = Mathf.Min(MaxHealth, A.Health + HealAmount);
+            }
+
+            Health = Mathf.Max(0, Health - HealAmount);
         }
     }
 
@@ -170,10 +357,10 @@ public class Ant : AbstractAnt
             // AirBlock B = (AirBlock) GetBlock(block_x, block_y+1, block_z);
             // B.AddPheromones('F', 1);
         }
-
-
-        //NewAnt.transform.position = new Vector3(XSpawn, YSpawn-3.9f, ZSpawn+1);
     }
+
+    //     //NewAnt.transform.position = new Vector3(XSpawn, YSpawn-3.9f, ZSpawn+1);
+    // }
 
     public Dictionary<int[], double> GetDestinationPheromones(List<int[]> Destinations)
     {

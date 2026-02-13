@@ -36,7 +36,7 @@ namespace Antymology.Terrain
         /// </summary>
         private AbstractBlock[,,] Blocks;
 
-        private int NumAnts = 100;
+        public int NumAnts = 500;
 
         /// <summary>
         /// Reference to the geometry data of the chunks.
@@ -117,7 +117,8 @@ namespace Antymology.Terrain
                 {
                     for (int k = 0; k < FirstLayerWeights.GetLength(1); k++)
                     {
-                        FirstLayerWeights[i,j] = RNG.NextDouble();
+                        // Generate random weight between -50 and 50
+                        FirstLayerWeights[j,k] = (RNG.NextDouble() * 100) - 50;
                     }
                 }
 
@@ -128,7 +129,7 @@ namespace Antymology.Terrain
                 {
                     for (int k = 0; k < secondlayerweights.GetLength(1); k++)
                     {
-                        secondlayerweights[i,j] = RNG.NextDouble();
+                        secondlayerweights[j,k] = (RNG.NextDouble() * 100) - 50;
                     }
                 }
 
@@ -180,16 +181,20 @@ namespace Antymology.Terrain
                 NewAnt.id = i;
 
                 // NewAnt.transform.SetParent(transform, false);
-                // Need to slightly adjust the Y and Z positioning so that ant is standing on top of correct block
+                // Need to slightly adjust the Y positioning so that ant is standing on top of correct block
                 NewAnt.transform.position = new Vector3(XSpawn, YSpawn-1.2f, ZSpawn);
 
-                Ants[i] = NewAnt;
-
-                DecisionModel AntModel = new(10, 5);
+                DecisionModel AntModel = new(10, 4);
 
                 List<double[,]> weights = ModelWeights[i];
                 double[,] firstLayerWeights = weights[0];
-                double[,] secondLayerWeights = weights[]
+                double[,] secondLayerWeights = weights[1];
+
+                AntModel.AddFirstLayer(16, Activations.ReLU, firstLayerWeights);
+                AntModel.AddLayer(4, Activations.Linear, secondLayerWeights);
+
+                NewAnt.Model = AntModel;
+                Ants[i] = NewAnt;
             }
 
             int QueenX, QueenY, QueenZ;
