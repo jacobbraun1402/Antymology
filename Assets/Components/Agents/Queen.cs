@@ -1,12 +1,7 @@
 using UnityEngine;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
 using Antymology.Terrain;
-using System.Linq.Expressions;
-
-
 
 public class Queen : Ant
 {
@@ -22,6 +17,8 @@ public class Queen : Ant
         ProbMoving = 0.25f;
     }
 
+    // Queen will build a nest block if she has enough health, otherwise she will move to a random location
+    // If Queen's health is at 0 she will be inactive
     public override void UpdateAnt()
     {
         if (Health > 0)
@@ -58,12 +55,11 @@ public class Queen : Ant
             block_y = Destination[1]; 
             block_z = Destination[2];
 
-            // UpdatePosition(block_x, block_y, block_z);
             Angle = UnityEngine.Random.Range(0f, 360f);
             UpdateNeeded = true;
         }
 
-        // Queen deposits her own pheromone into the airblock above block she's standing on
+        // Queen deposits pheromones into the airblock above block she's standing on
         DepositPheromones(10);
     }
 
@@ -71,7 +67,6 @@ public class Queen : Ant
     {
         // Move queen up one, and place nest block below her. Also need to move
         // Any ants that may be standing on this spot
-        
         WorldManager.Instance.SetBlock(block_x, block_y+1, block_z, new NestBlock());
 
         int new_y = WorldManager.Instance.FindFirstSolidBlock(block_x, block_z);
@@ -91,7 +86,7 @@ public class Queen : Ant
         }
 
         // Queen will deposit extra pheromones if she builds a nest block this tick
-        DepositPheromones(500);
+        DepositPheromones(50);
 
         WorldManager.Instance.NumNestBlocks++;
 

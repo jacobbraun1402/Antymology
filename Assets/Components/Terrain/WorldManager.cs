@@ -30,13 +30,16 @@ namespace Antymology.Terrain
 
         public float TimeSinceLastUpdate;
 
+        // Number of ticks for this generation
         public int ElapsedTicks;
 
+        // Which generation we're on
         public int Generation;
 
+        // The number of nest blocks currently in the world for this generation
         public int NumNestBlocks;
 
-        public readonly int TotalTicksPerGeneration = 10;
+        public readonly int TotalTicksPerGeneration = 100;
 
         public AbstractAnt[] Ants;
 
@@ -45,7 +48,7 @@ namespace Antymology.Terrain
         /// </summary>
         private AbstractBlock[,,] Blocks;
 
-        public int NumAnts = 500;
+        public int NumAnts { get; private set; } = 500;
 
         /// <summary>
         /// Reference to the geometry data of the chunks.
@@ -81,37 +84,9 @@ namespace Antymology.Terrain
             NumNestBlocks = 0;
 
             InitWorld();
-            // TotalTicksPerGeneration = 10;
-            // // Generate new random number generator
-            // RNG = new System.Random(ConfigurationManager.Instance.Seed);
-
-            // // Generate new simplex noise generator
-            // SimplexNoise = new SimplexNoise(ConfigurationManager.Instance.Seed);
-
-            // ElapsedTicks = 0;
-
-            // Generation = 1;
-
-            // NumNestBlocks = 0;
-
-            // // Initialize a new 3D array of blocks with size of the number of chunks times the size of each chunk
-            // Blocks = new AbstractBlock[
-            //     ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter, //x
-            //     ConfigurationManager.Instance.World_Height * ConfigurationManager.Instance.Chunk_Diameter, // y
-            //     ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter]; // z
-
-            // // Create list storing all ants and the queen
-            // Ants = new Ant[NumAnts+1];
-
-            // // BlocksWithPheromone = new();
-
-            // // Initialize a new 3D array of chunks with size of the number of chunks
-            // Chunks = new Chunk[
-            //     ConfigurationManager.Instance.World_Diameter,
-            //     ConfigurationManager.Instance.World_Height,
-            //     ConfigurationManager.Instance.World_Diameter];
         }
 
+        // Initialize/reset all of the data fields for the world
         private void InitWorld()
         {
             // Generate new random number generator
@@ -128,8 +103,6 @@ namespace Antymology.Terrain
 
             // Create list storing all ants and the queen
             Ants = new Ant[NumAnts+1];
-
-            // BlocksWithPheromone = new();
 
             // Initialize a new 3D array of chunks with size of the number of chunks
             Chunks = new Chunk[
@@ -149,6 +122,7 @@ namespace Antymology.Terrain
             Camera.main.transform.position = new Vector3(0 / 2, Blocks.GetLength(1), 0);
             Camera.main.transform.LookAt(new Vector3(Blocks.GetLength(0), 0, Blocks.GetLength(2)));
 
+            // When we first start the simultation, weights ants use in their decision models are randomized
             List<List<double[,]>> ModelWeights = GenerateRandomWeights();
             GenerateAnts(ModelWeights);
         }
@@ -166,7 +140,7 @@ namespace Antymology.Terrain
                     for (int k = 0; k < FirstLayerWeights.GetLength(1); k++)
                     {
                         // Generate random weight between -50 and 50
-                        FirstLayerWeights[j,k] = (RNG.NextDouble() * 100) - 50;
+                        FirstLayerWeights[j,k] = RNG.NextDouble();
                     }
                 }
 
@@ -177,7 +151,7 @@ namespace Antymology.Terrain
                 {
                     for (int k = 0; k < secondlayerweights.GetLength(1); k++)
                     {
-                        secondlayerweights[j,k] = (RNG.NextDouble() * 100) - 50;
+                        secondlayerweights[j,k] = RNG.NextDouble();
                     }
                 }
 
@@ -188,10 +162,7 @@ namespace Antymology.Terrain
 
             return AllWeights;
         }
-        /// <summary>
-        /// Generate ants to spawn on top of a random mulch block.
-        /// Number of ants to generate can be changed using the AntCount field in the ConfigurationManager
-        /// </summary>
+        // Generate ants to spawn on top of a random mulch block.
         private void GenerateAnts(List<List<double[,]>> ModelWeights)
         {
             List<int[]> MulchBlocks = GetSurfaceMulchBlocks();
@@ -228,12 +199,13 @@ namespace Antymology.Terrain
 
                 NewAnt.id = i;
 
-                // NewAnt.transform.SetParent(transform, false);
                 // Need to slightly adjust the Y positioning so that ant is standing on top of correct block
                 NewAnt.transform.position = new Vector3(XSpawn, YSpawn-1.2f, ZSpawn);
-
+                
+                
+                // Create ant's decision model using weights provided
                 DecisionModel AntModel = new(10, 4);
-
+                
                 List<double[,]> weights = ModelWeights[i];
                 double[,] firstLayerWeights = weights[0];
                 double[,] secondLayerWeights = weights[1];
@@ -269,7 +241,8 @@ namespace Antymology.Terrain
         #endregion
 
         #region Methods
-        // At a given x and z coordinate, find the y coordinate of the first block that is below an air block
+
+        // At given x and z coordinates, find the y coordinate of the first block that is below an air block
         public int FindFirstSolidBlock(int x, int z)
         {
             int y;
@@ -285,7 +258,7 @@ namespace Antymology.Terrain
         }
 
         // finds all of the mulch blocks that have an air block directly above it
-        // Used to find possible spawn locations of the ants 
+        // Used to find possible spawn locations of the ants when world is generated
         private List<int[]> GetSurfaceMulchBlocks()
         {
             List<int[]> MulchBlocks = new List<int[]>();
@@ -304,6 +277,7 @@ namespace Antymology.Terrain
             return MulchBlocks;
         }
 
+        // Get a list of other ants that are on the same block as an ant with id CallerID
         public List<AbstractAnt> OtherAntsAt(int CallerID, int WorldXCoordinate, int WorldYCoordinate, int WorldZCoordinate)
         {
             List<AbstractAnt> Result = new();
@@ -685,6 +659,9 @@ namespace Antymology.Terrain
             }
         }
 
+        // Called when we need to make the next generation of ants
+        // Destroys all blocks and rebuilds the world
+        // Then breeds the ants and repopulates the world with the new generation of ants
         void ResetWorld()
         {
             GameObject[] Chunks = GameObject.FindGameObjectsWithTag("Chunk");
@@ -717,6 +694,7 @@ namespace Antymology.Terrain
             GenerateAnts(NextGenModelWeights);
         }
 
+        // Air blocks with pheromones spread the pheromones to neighbouring air blocks
         void DiffusePheromones()
         {
             for (int x = 0; x < Blocks.GetLength(0); x++)
@@ -740,7 +718,7 @@ namespace Antymology.Terrain
             }
         }
 
-
+        // Find air blocks that are adjacent to block at the given coordinates
         List<AirBlock> GetNeighbouringAirBlocks(int x, int y, int z)
         {
             List<AirBlock> Result = new();
@@ -766,5 +744,4 @@ namespace Antymology.Terrain
 
     #endregion
     }
-    
 }

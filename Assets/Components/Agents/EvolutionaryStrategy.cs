@@ -82,6 +82,7 @@ public static class EvolutionaryStrategy
         return Pairs;
     }
 
+    // Create all of the new ants for the next generation
     public static List<List<double[,]>> BreedAllAnts(List<Tuple<Ant,Ant>> Pairs)
     {
         List<List<double[,]>> ModelWeights = new();
@@ -96,6 +97,7 @@ public static class EvolutionaryStrategy
         return ModelWeights;
     }
 
+    // Recombine and mutate the model parameters of two parent ants
     public static List<double[,]> Breed(Tuple<Ant, Ant> Pair)
     {
         List<double[,]> NewWeights = new();
@@ -128,13 +130,13 @@ public static class EvolutionaryStrategy
 
         for (int i = 0; i < NewWeights.GetLength(0); i++)
         {
-            // Do intermediate recombination and then mutate using Rechenburg heuristic
+            // Do discrete recombination and then mutate using Rechenburg heuristic
             for (int j = 0; j < NewWeights.GetLength(1); j++)
             {
-                NewWeights[i,j] = Mutate((Ant1Layer[i,j] + Ant1Layer[i,j])/2);
+                double SelectedGene = RNG.NextDouble() <= 0.5 ? Ant1Layer[i,j] : Ant2Layer[i,j];
+                NewWeights[i,j] = Mutate(SelectedGene);
             }
         }
-
         return NewWeights;
     }
 
@@ -143,7 +145,7 @@ public static class EvolutionaryStrategy
         double MutationRoll = RNG.NextDouble();
         if (MutationRoll <= MutationRate)
         {
-            return RNG.NextDouble() < 0.5 ? Beta * OriginalValue : (1/Beta) * OriginalValue;
+            return RNG.NextDouble() < 0.5 ? Beta * OriginalValue : 1/Beta * OriginalValue;
         }
         return OriginalValue;
     }

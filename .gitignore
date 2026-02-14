@@ -62,3 +62,6 @@ crashlytics-build.properties
 /Assets/_Recovery
 /Assets/TextMesh Pro
 Assets/TextMesh Pro.meta
+/Packages
+/UserSettings
+/Antymology.slnx

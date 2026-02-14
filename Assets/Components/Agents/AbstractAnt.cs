@@ -5,9 +5,12 @@ using System.Linq;
 using Antymology.Terrain;
 using UnityEngine;
 
+
+// Contains fields and functionality that are common to both worker ants and the Queen
 [RequireComponent(typeof(BoxCollider))]
 public abstract class AbstractAnt : MonoBehaviour
 {
+    // Stores the x, y and z coordinates of the block the ant is standing on
     public int block_x, block_y, block_z;
 
     public float Health;
@@ -24,6 +27,7 @@ public abstract class AbstractAnt : MonoBehaviour
 
     public int HealthDecayRate = 1;
 
+    // Used when re-rendering ants
     public bool UpdateNeeded;
 
     protected float TimeBetweenTicks;
@@ -34,7 +38,7 @@ public abstract class AbstractAnt : MonoBehaviour
     public abstract void UpdateAnt();
     public abstract void Move();
 
-
+    // Set up fields that all children use
     void Awake()
     {
         RNG = new System.Random();
@@ -45,6 +49,7 @@ public abstract class AbstractAnt : MonoBehaviour
         UpdateNeeded = false;
     }
 
+    // Main update loop that workers and queen follow is the same, but they each do different things when they need to update
     void Update()
     {
         TimeSinceLastUpdate += Time.deltaTime;
@@ -55,10 +60,9 @@ public abstract class AbstractAnt : MonoBehaviour
         } 
     }
 
-    // Look for valid destinations that an ant can move to
+    // Look for valid destinations that an ant can move to in a radius of 1 block from the ant's current position
     protected List<int[]> GetValidDestinations()
     {
-        // AbstractBlock[,,] neighbours = new AbstractBlock[3,5,3];
         List<int[]> Result = new();
         for (int i = -1; i <= 1; i++)
         {
@@ -67,11 +71,6 @@ public abstract class AbstractAnt : MonoBehaviour
                 for (int k = -1; k <= 1; k++)
                 {
                     // Set all blocks directly above, below, and diagonal to ant as invalid
-                    // if ((i == 0 && k == 0) || (Math.Abs(i) == 1 && Math.Abs(k) == 1))
-                    // {
-                    //     continue;
-                    // }
-                    // Only check if Ant can move forwards, backwards, left or right
                     // When I had it so that ants could move diagonally, their movement patterns were kind of wonky
                     if ((i == 0) ^ (k == 0))
                     {
@@ -80,7 +79,6 @@ public abstract class AbstractAnt : MonoBehaviour
                         int ycord = block_y + j;
                         int zcord = block_z + k;
                         AbstractBlock Block = GetBlock(xcord, ycord, zcord);
-                        // neighbours[1+i, 2+j, 1+k] = Block;
 
                         // If block is solid and block above it is air, then ant could move to it
                         if ((Block is not AirBlock) && (GetBlock(xcord, ycord + 1, zcord) is AirBlock))
@@ -100,21 +98,11 @@ public abstract class AbstractAnt : MonoBehaviour
         return WorldManager.Instance.GetBlock(x, y, z);
     }
 
+    // Apply some adjustments to the ant sprite so that it doesn't look like it's standing on air
     protected void UpdatePosition(int x,int y,int z)
     {
         // transform.position = new Vector3(x, y - 3.9f, z + 1);
         transform.position = new Vector3(x, y-1.2f, z);
-    }
-
-        void LateUpdate()
-    {
-        if (UpdateNeeded)
-        {
-            UpdatePosition(block_x, block_y, block_z);
-            SetYRotation(Angle);
-            UpdateNeeded = false;
-        }
-
     }
 
     protected void SetYRotation(float angle)
@@ -122,5 +110,16 @@ public abstract class AbstractAnt : MonoBehaviour
         BoxCollider collider = GetComponent<BoxCollider>();
         Vector3 center = transform.TransformPoint(collider.center);
         transform.RotateAround(center, Vector3.up, angle);
+    }
+
+    // Called after each other update function, re-draws the ant if they moved this turn.
+    void LateUpdate()
+    {
+        if (UpdateNeeded)
+        {
+            UpdatePosition(block_x, block_y, block_z);
+            SetYRotation(Angle);
+            UpdateNeeded = false;
+        }
     }
 }

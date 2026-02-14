@@ -2,6 +2,7 @@ using Antymology.Terrain;
 using TMPro;
 using UnityEngine;
 
+// Used to update the text displaying the world information
 public class UIManager : Singleton<UIManager>
 {
     public TMP_Text text;

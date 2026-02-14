@@ -6,46 +6,15 @@ using System.Linq;
 using Antymology.Terrain;
 using UnityEngine;
 
-// [RequireComponent(typeof(BoxCollider))]
 public class Ant : AbstractAnt
 {
-
-    // private bool showDebug = false;
-
-    // public int block_x, block_y, block_z;
-    // public float Health = 50;
-
-    // public int id;
-
-    // private bool DebugMessages = false;
-
-    // public const float MaxHealth = 100;
-
-    // private float ProbMoving;
-    // private float ProbDigging;
-
     public float HealthGivenToQueen;
 
     private float HealAmount = 10;
 
-    // private System.Random RNG;
-
-    // public float TimeBetweenTicks;
-
-    // public int HealthDecayRate = 2;
-
-    public int HealthFromMulch = 10;
+    public int HealthFromMulch = 20;
 
     public DecisionModel Model;
-
-    // public float Angle;
-
-    // private bool UpdateNeeded;
-
-    // public AirBlock air = new AirBlock();
-
-    // float TimeSinceLastUpdate;
-
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -55,153 +24,69 @@ public class Ant : AbstractAnt
         Health = 100;
 
         HealthGivenToQueen = 0;
-
-
-
-        // RNG = new System.Random();
-
-        // TimeBetweenTicks = WorldManager.Instance.timeBetweenTicks;
-        // UpdateNeeded = false;
     }
 
-    // Update is called once per frame
-    // void Update()
-    // {
-    //     TimeSinceLastUpdate += Time.deltaTime;
-    //     if (TimeSinceLastUpdate >= TimeBetweenTicks)
-    //     {
-    //         TimeSinceLastUpdate -= TimeBetweenTicks;
-    //         UpdateAnt();
-    //     }
-    // }
-
-    // public override void UpdateAnt()
-    // {
-    //     HealOthers();
-
-    //     if (Health <= 0)
-    //     {
-    //         if (DebugMessages) Debug.Log($"Ant {id} died");
-    //         Destroy(gameObject);
-    //     }
-
-    //     double MoveRoll = RNG.NextDouble();
-
-    //     if (MoveRoll <= ProbMoving)
-    //     {
-    //         Move();
-    //     }
-    //     else
-    //     {
-    //         Dig();
-    //     }
-
-    //     float DecayMultiplier = (GetBlock(block_x, block_y, block_z) is AcidicBlock) ? 2 : 1;
-
-    //     Health = Mathf.Max(Health - (HealthDecayRate * DecayMultiplier), 0);
-
-    //     // SetYRotation(UnityEngine.Random.Range(0f, 360f));
-    // }
     public override void UpdateAnt()
     {
-        // HealOthers();
-
         if (Health <= 0)
         {
             if (DebugMessages) Debug.Log($"Ant {id} died");
             gameObject.SetActive(false);
         }
 
-        // double MoveRoll = RNG.NextDouble();
-
-        // if (MoveRoll <= ProbMoving)
-        // {
-        //     Move();
-        // }
-        // else
-        // {
-        //     Dig();
-        // }
-
-        // float DecayMultiplier = (GetBlock(block_x, block_y, block_z) is AcidicBlock) ? 2 : 1;
-
-        // Health = Mathf.Max(Health - (HealthDecayRate * DecayMultiplier), 0);
-
-        // SetYRotation(UnityEngine.Random.Range(0f, 360f));
-
+        // Collect information about objects near the ant so that they can decide what to do next
         double[] modelInputs = GetModelInputs();
-        double[] outputs = Model.MakeDecision(modelInputs);
+        // Debug.Log(string.Join(",", modelInputs.Select(x => x.ToString())));
         
-        // each element in outputs maps to what decision the ant should take. These are:
+        //
+        // Model.Layers[0].Weights();
+
+        // Debug.Log()
+        double[] outputs = Model.MakeDecision(modelInputs);
+
+
+        // Debug.Log(string.Join(",", outputs.Select(x => x.ToString())));
+        
+        // each element in outputs the probability of taking a certain action, and the sum of these probabilities is 1. 
+        // These actions are: 
         // 0: Move towards Pheromones
-        // 1: move randomly (explore the map)
+        // 1: move randomly
         // 2: heal other ants
         // 3: dig
 
-        double maxProb = outputs.Max();
+        double DecisionRoll = RNG.NextDouble();
         
-        if (maxProb == outputs[0])
-        {
+        if (DecisionRoll <= outputs[0])
+        { // Move towards pheromones
             Move();
         }
-        else if (maxProb == outputs[1])
-        {
+
+        else if (DecisionRoll <= (outputs[0] + outputs[1]))
+        { // move randomly
             RandomMove();
         }
-        else if ((maxProb == outputs[2]) && (Health >= HealAmount))
-        {
-            HealOthers();
+
+        else if (DecisionRoll <= (outputs[0] + outputs[1] + outputs[2]))
+        {   // heal other ants if they have enough of their own health
+            if (Health >= HealAmount) HealOthers();
+            else RandomMove();
         }
-        else if (maxProb == outputs[3])
+        else
         {
             Dig();
         }
 
         float DecayMultiplier = (GetBlock(block_x, block_y, block_z) is AcidicBlock) ? 2 : 1;
         Health = Mathf.Max(Health - (HealthDecayRate * DecayMultiplier), 0);
-        
     }
 
-    void MoveToPheromones()
-    {
-        Dictionary<int[], double> DestinationPheromones = GetDestinationPheromones(GetValidDestinations());
-
-        if (DestinationPheromones.Keys.Count > 0) 
-        {
-            int[] maxCoordinates = new int[3];
-            double maxValue = 0;
-
-            foreach (var coord in DestinationPheromones.Keys)
-            {
-                if (DestinationPheromones[coord] >= maxValue)
-                {
-                    maxCoordinates = coord;
-                    maxValue = DestinationPheromones[coord];
-                }
-            }
-
-            block_x = maxCoordinates[0]; 
-            block_y = maxCoordinates[1]; 
-            block_z = maxCoordinates[2];
-
-            // Debug.Log($"Ant {id} moved from ({block_x}, {block_y}, {block_z}) to ({maxCoordinates[0]}, {maxCoordinates[1]} {maxCoordinates[2]})");
-
-            // UpdatePosition(block_x, block_y, block_z);
-            Angle = UnityEngine.Random.Range(0f, 360f);
-            UpdateNeeded = true;
-        }
-    }
-
+    // Pick a random block nearby and move to it
     void RandomMove()
     {
         List<int[]> ValidDestinations = GetValidDestinations();
         if (ValidDestinations.Count > 0)
         {
-            // Dictionary<int[], double> DestinationPheromones = GetDestinationPheromones(ValidDestinations);
-
             int[] Destination = ValidDestinations[UnityEngine.Random.Range(0, ValidDestinations.Count)];
-            // int[] Destination = ValidDestinations[RNG.Next(0, ValidDestinations.Count)];
-            // Debug.Log($"Ant {id} moved from ({block_x}, {block_y}, {block_z}) to ({Destination[0]}, {Destination[1]} {Destination[2]})");
 
             block_x = Destination[0]; 
             block_y = Destination[1]; 
@@ -210,15 +95,11 @@ public class Ant : AbstractAnt
             // UpdatePosition(block_x, block_y, block_z);
             Angle = UnityEngine.Random.Range(0f, 360f);
             UpdateNeeded = true;
-
-            // Worker ants deposit a bit of pheromones whenever they move into the airblock above where they're standing
-            // AirBlock B = (AirBlock) GetBlock(block_x, block_y+1, block_z);
-            // B.AddPheromones('F', 1);
-
-
         }
     }
 
+    // Collect information on the ant's surroundings and reformat it into something that can
+    // be understood by the model
     double[] GetModelInputs()
     {
         double[] inputs = new double[10];
@@ -271,7 +152,6 @@ public class Ant : AbstractAnt
         {
             if (ant is Queen Q)
             {
-                // Debug.Log($"Ant {id} is by the queen");
                 QueenHere = 1;
                 break;
             }
@@ -280,14 +160,13 @@ public class Ant : AbstractAnt
         inputs[7] = QueenHere;
 
         Dictionary<int[],double> DestinationPheromones = GetDestinationPheromones(GetValidDestinations());
-
         if (DestinationPheromones.Count > 0)
         {
             inputs[8] = GetDestinationPheromones(GetValidDestinations()).Values.Average();
         }
         else inputs[8] = 0;
         
-        inputs[9] = Health;
+        inputs[9] = Health / MaxHealth;
 
         return inputs;
     }
@@ -297,41 +176,32 @@ public class Ant : AbstractAnt
         // // Check to see if there are other ants at same location
         List<AbstractAnt> OtherAnts = WorldManager.Instance.OtherAntsAt(id, block_x, block_y, block_z);
         // // If Ant is on same spot as the queen, then they must heal only her
-        int QueenID = WorldManager.Instance.NumAnts;
-
         bool QueenHere = false;
-
         foreach (AbstractAnt A in OtherAnts)
         {
             if (A is Queen Q)
             {
-                Debug.Log($"Ant {id} healed the queen");
+                // Debug.Log($"Ant {id} healed the queen");
                 HealthGivenToQueen += HealAmount;
                 Q.Health = Mathf.Min(MaxHealth, Q.Health + HealAmount);
                 Health = Mathf.Max(0, Health-HealAmount);
                 QueenHere = true;
             }
         }
-
         // check if other ants are at same location as this one. If yes, try and heal those ants
         if ((OtherAnts.Count > 0) && !QueenHere)
         {
             float HealthGiven = HealAmount / OtherAnts.Count;
-            // if (DebugMessages)
-            // {
-                // string Message = $"Ant {id} gave {HealthGiven} to ants " + String.Join(", ", OtherAnts.Select(A => A.id));
-                // Debug.Log(Message);
-            // }
-
             foreach (AbstractAnt A in OtherAnts)
             {
-                A.Health = Mathf.Min(MaxHealth, A.Health + HealAmount);
+                A.Health = Mathf.Min(MaxHealth, A.Health + HealthGiven);
             }
-
             Health = Mathf.Max(0, Health - HealAmount);
         }
     }
 
+    // Ant will randomly select a block to move to, but is more likely to move to 
+    // a destination that has higher pheromone concentrations
     public override void Move()
     {
         List<int[]> ValidDestinations = GetValidDestinations();
@@ -340,28 +210,18 @@ public class Ant : AbstractAnt
             Dictionary<int[], double> DestinationPheromones = GetDestinationPheromones(ValidDestinations);
 
             int[] Destination = PickDestination(DestinationPheromones);
-
-
-            // int[] Destination = ValidDestinations[RNG.Next(0, ValidDestinations.Count)];
             if (DebugMessages) Debug.Log($"Ant {id} moved from ({block_x}, {block_y}, {block_z}) to ({Destination[0]}, {Destination[1]} {Destination[2]})");
 
             block_x = Destination[0]; 
             block_y = Destination[1]; 
             block_z = Destination[2];
 
-            // UpdatePosition(block_x, block_y, block_z);
             Angle = UnityEngine.Random.Range(0f, 360f);
             UpdateNeeded = true;
-
-            // Worker ants deposit a bit of pheromones whenever they move into the airblock above where they're standing
-            // AirBlock B = (AirBlock) GetBlock(block_x, block_y+1, block_z);
-            // B.AddPheromones('F', 1);
         }
     }
 
-    //     //NewAnt.transform.position = new Vector3(XSpawn, YSpawn-3.9f, ZSpawn+1);
-    // }
-
+    // Find the pheromone concentrations of the air block that is above a potential destination block
     public Dictionary<int[], double> GetDestinationPheromones(List<int[]> Destinations)
     {
         Dictionary<int[], double> Result = new();
@@ -381,6 +241,8 @@ public class Ant : AbstractAnt
         return Result;
     }
 
+    // Pick a random destination to move to. Blocks with a higher pheromone concentration have a higher
+    // chance of being selected.
     public int[] PickDestination(Dictionary<int[], double> DestinationPheromones)
     {
         List<int[]> keys = DestinationPheromones.Keys.ToList();
@@ -393,7 +255,6 @@ public class Ant : AbstractAnt
         }
         else
         {
-            // Dictionary<int[], double> probabilities = new();
             double total = DestinationPheromones.Values.Sum();
             double roll = UnityEngine.Random.Range(0f, 1f);
             double sum = 0;
@@ -407,193 +268,39 @@ public class Ant : AbstractAnt
                 }
                 sum += probability;
             }
-
-            
-            // foreach (int[] key in keys)
-            // {
-            //     if (roll <= probabilities[key] + sum)
-            //     {
-            //         destination = key;
-            //         break;
-            //     }
-            //     sum += probabilities[key];
-            // }
         }
         return destination;
     }
 
-    // If ant is surrounded by columns of blocks that are two or more blocks higher than the ant in all 4 directions,
-    // Ant can't dig. This should help to prevent ants from digging themselves into holes they can't get out out
-    bool CheckIfCanDig()
-    {
-        AbstractBlock[,,] neighbours = GetNeighbouringBlocks();
-
-        AbstractBlock[] LeftColumns = new AbstractBlock[] {neighbours[0,3,1], neighbours[0,4,1]};
-        AbstractBlock[] RightColumns = new AbstractBlock[] {neighbours[2, 3, 1], neighbours[2, 4, 1]};
-        AbstractBlock[] BackwardColumns = new AbstractBlock[] {neighbours[1,3,0], neighbours[1,4,0]};
-        AbstractBlock[] ForwardColumns = new AbstractBlock[] {neighbours[1,3,2], neighbours[1,4,2]};
-
-        AbstractBlock[] AllColumnBlocks = (new AbstractBlock[] {neighbours[0, 3, 1], neighbours[0, 4, 1]})
-        .Concat(new AbstractBlock[] {neighbours[2, 3, 1], neighbours[2, 4, 1]})
-        .Concat(new AbstractBlock[] {neighbours[1, 3, 0], neighbours[1, 4, 0]})
-        .Concat(new AbstractBlock[] {neighbours[1, 3, 2], neighbours[1, 4, 2]}).ToArray();
-
-        // if (AllColumns.Sum(a => a is not AirBlock ? 1 : 0) == 8)
-        // {
-        //     return false;
-        // }
-
-        // return true;
-
-
-        return AllColumnBlocks.Sum(a => a is not AirBlock ? 1 : 0) != 8;
-    }
-
-    AbstractBlock[,,] GetNeighbouringBlocks()
-    {
-        AbstractBlock[,,] neighbours = new AbstractBlock[3,5,3];
-        for (int i = -1; i <= 1; i++)
-        {
-            for (int j = -2; j <= 2; j++)
-            {
-                for (int k = -1; k <= 1; k++)
-                {
-                    if ((i == 0) ^ (k == 0))
-                    {
-                        // world coordinates of block to query
-                        int xcord = block_x + i;
-                        int ycord = block_y + j;
-                        int zcord = block_z + k;
-                        AbstractBlock Block = GetBlock(xcord, ycord, zcord);
-                        neighbours[1+i, 2+j, 1+k] = Block;
-                    }
-                }
-            }
-        }
-        return neighbours;
-    }
-
-    // List<int[]> GetValidDestinations()
-    // {
-    //     // AbstractBlock[,,] neighbours = new AbstractBlock[3,5,3];
-    //     List<int[]> Result = new();
-    //     for (int i = -1; i <= 1; i++)
-    //     {
-    //         for (int j = -2; j <= 2; j++)
-    //         {
-    //             for (int k = -1; k <= 1; k++)
-    //             {
-    //                 // Set all blocks directly above, below, and diagonal to ant as invalid
-    //                 // if ((i == 0 && k == 0) || (Math.Abs(i) == 1 && Math.Abs(k) == 1))
-    //                 // {
-    //                 //     continue;
-    //                 // }
-    //                 // Only check if Ant can move forwards, backwards, left or right
-    //                 // When I had it so that ants could move diagonally, their movement patterns were kind of wonky
-    //                 if ((i == 0) ^ (k == 0))
-    //                 {
-    //                     // world coordinates of block to query
-    //                     int xcord = block_x + i;
-    //                     int ycord = block_y + j;
-    //                     int zcord = block_z + k;
-    //                     AbstractBlock Block = GetBlock(xcord, ycord, zcord);
-    //                     // neighbours[1+i, 2+j, 1+k] = Block;
-
-    //                     // If block is solid and block above it is air, then ant could move to it
-    //                     if ((Block is not AirBlock) && (GetBlock(xcord, ycord + 1, zcord) is AirBlock))
-    //                     {
-    //                         Result.Add(new int[] {xcord, ycord, zcord});
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     return Result;
-    // }
-
-    // AbstractBlock[,,] GetNeighbours()
-    // {
-    //     // Contains blocks surrounding block ant is standing on, up to two blocks above and two blocks below
-    //     // with a radius of 1
-    //     // block ant is standing on will be element [1,2,1] in the array
-    //     AbstractBlock[,,] neighbours = new AbstractBlock[3,5,3];
-
-    //     for (int i = -1; i <= 1; i++)
-    //     {
-    //         for (int j = -2; j <= 2; j++)
-    //         {
-    //             for (int k = -1; k < 1; k++)
-    //             {
-    //                 AbstractBlock Block = WorldManager.Instance.GetBlock(block_x + i, block_y + j, block_z + k);
-    //                 neighbours[1+i, 2+j, 1+k] = Block;
-    //             }
-    //         }
-    //     }
-    //     return neighbours;
-    // }
-
+    // remove a block from the world, and gain health if the ant dug a mulch block
     void Dig()
     {
         AbstractBlock CurrentBlock = GetBlock(block_x, block_y, block_z);
-        // double PheromoneAmount = 1;
-        // bool ValidBlock = !((CurrentBlock is ContainerBlock) || (CurrentBlock is AirBlock) || (CurrentBlock is NestBlock));
+
+        // Check if ant is allowed to dig up the block they are standing on
         if (ValidBlock(CurrentBlock))
         {
             if (DebugMessages) Debug.Log($"Ant {id} dug {CurrentBlock.GetType()} at ({block_x}, {block_y}, {block_z})");
 
             if (CurrentBlock is MulchBlock)
             {
-                Health = Mathf.Min(Health + 10, MaxHealth);
-                // Ants deposit extra pheromone after they find food
-                // PheromoneAmount = 10;
+                Health = Mathf.Min(Health + HealthFromMulch, MaxHealth);
             }
             
+            // remove the block and move ant down to next solid block below the one they just removed
             WorldManager.Instance.SetBlock(block_x, block_y, block_z, new AirBlock(block_x, block_y, block_z));
             block_y = WorldManager.Instance.FindFirstSolidBlock(block_x, block_z);
 
             Angle = UnityEngine.Random.Range(0f, 360f);
             UpdateNeeded = true;
-
-
-            // AirBlock B = (AirBlock) GetBlock(block_x, block_y+1, block_z);
-            // B.AddPheromones('Q', PheromoneAmount);
         }
     }
 
+    // Checks to make sure that block ant wants to dig up is not occupied by other ants and is a valid material
     bool ValidBlock(AbstractBlock CurrentBlock)
     {
         List<AbstractAnt> OtherAnts = WorldManager.Instance.OtherAntsAt(id, block_x, block_y, block_z);
         bool ValidMaterial = !((CurrentBlock is ContainerBlock) || (CurrentBlock is AirBlock) || (CurrentBlock is NestBlock));
         return ValidMaterial && (OtherAnts.Count == 0);
     }
-
-    // // Have this just because I'm too lazy to type out WorldManager.Instance everytime I want to get a block lol
-    // AbstractBlock GetBlock(int x, int y, int z)
-    // {
-    //     return WorldManager.Instance.GetBlock(x, y, z);
-    // }
-
-    // void UpdatePosition(int x,int y,int z)
-    // {
-    //     // transform.position = new Vector3(x, y - 3.9f, z + 1);
-    //     transform.position = new Vector3(x, y-1.2f, z);
-    // }
-
-    // void LateUpdate()
-    // {
-    //     if (UpdateNeeded)
-    //     {
-    //         UpdatePosition(block_x, block_y, block_z);
-    //         SetYRotation(Angle);
-    //         UpdateNeeded = false;
-    //     }
-
-    // }
-
-    // void SetYRotation(float angle)
-    // {
-    //     BoxCollider collider = GetComponent<BoxCollider>();
-    //     Vector3 center = transform.TransformPoint(collider.center);
-    //     transform.RotateAround(center, Vector3.up, angle);
-    // }
 }

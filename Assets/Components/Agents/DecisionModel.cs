@@ -1,6 +1,13 @@
 using System;
 using System.Linq;
 using System.Collections.Generic;
+// using System.Diagnostics;
+using UnityEngine;
+
+// Neural network-type model that the ant uses to decide on their next action
+// In the final model I used in the simulation, there was 1 hidden layer
+// The Softmax function is applied to the outputs so that the actions an 
+// ant could take are represented as a probability distribution
 
 // Features:
 // Current Block they are standing on
@@ -15,32 +22,29 @@ using System.Collections.Generic;
 // Move away from pheromones
 // Heal other ants
 // Dig
-
-// struct ModelInputs(double[] CurrentBlock, double NumAnts, double QueenHere, double QueenPheromone, double FoodPheromone, double Health)
-// {
-//     double[] CurrentBlock = CurrentBlock;
-//     double NumAnts = NumAnts;
-//     double QueenHere = QueenHere;
-
-//     double QueenPheromone = QueenPheromone;
-//     double FoodPheromone = FoodPheromone;
-//     double Health = Health;
-// }
 public class Layer
 {
+    // number of neurons in this layer
     public int Units;
 
+    // the number of input variables
     public int InputSize;
+
+    // the values of the input variables
     public double[] Values;
 
+    // The weight or "slope" parameters for each variable and neuron.
     public double[,] Weights; // Rows: Units in layer, Columns: Input values
 
     // double[,] Output;
 
+    // Activation function applied to output of layer, the function I used (ReLU) can help with learning more complex relationships
+    // between input variables
     public Func<double, double> Activation;
 
     public Layer(int Units, int InputSize, Func<double, double> Activation)
-    {
+    {   
+        // Initialize all weights to 1
         Weights = new double[Units, InputSize];
         for (int i = 0; i < Weights.GetLength(0); i++)
         {
@@ -49,10 +53,7 @@ public class Layer
                 Weights[i,j] = 1;
             }
         }
-        // foreach (double i in Weights)
-        // {
-        //     Console.WriteLine(i);
-        // }
+
         Values = new double[InputSize];
         this.Units = Units;
         this.InputSize = InputSize;
@@ -69,6 +70,7 @@ public class Layer
         Values = vals;
     }
 
+    // For each neuron, sum up the variable values multiplied by its associated weight, then apply the activation function
     public double[] Evaluate()
     {
         double[] OutputArray = new double[Units];
@@ -83,13 +85,9 @@ public class Layer
         }
         return OutputArray;
     }
-
-    // double ReLU(double x)
-    // {
-    //     return Math.Max(0, x);
-    // }
 }
 
+// Helper class that contains the activation functions
 public static class Activations
 {
     public static double ReLU(double x)
@@ -104,19 +102,14 @@ public static class Activations
 
     public static double[] SoftMax(double[] Logits)
     {
-        double denom = Logits.ToList().Sum(Math.Exp);
-
+        double denom = Logits.ToList().Sum(x => Math.Exp(x));
         return Logits.ToList().Select(x => Math.Exp(x)/denom).ToArray();
     }
 }
 
+// Collects layers and combines them into the final model the ant uses
 public class DecisionModel
 {
-    // double x = Activations.ReLU(0.5);
-    // List<double[]> Weights;
-
-    // int NumLayers;
-
     public int InputSize;
     public int OutputSize;
     public List<Layer> Layers;
@@ -135,6 +128,7 @@ public class DecisionModel
         Layers.Add(l);
     }
 
+// Add the layer that contains the input values to the model
     public void AddFirstLayer(int Units, Func<double, double> Activation, double[,] weights)
     {
         Layer l = new(Units, InputSize, Activation);
@@ -142,6 +136,7 @@ public class DecisionModel
         Layers.Add(l);
     }
 
+    // Feed in input values, and return the decision probabilities
     public double[] MakeDecision(double[] Inputs)
     {
         double[] Outputs = Inputs.ToArray();
@@ -151,96 +146,11 @@ public class DecisionModel
             double[] LayerInputs = Outputs.ToArray();
             l.SetValues(LayerInputs);
             Outputs = l.Evaluate();
-            foreach (double x in Outputs) Console.WriteLine(x);
+            // foreach (double x in Outputs) Debug.Log(x);
         }
 
-        return Activations.SoftMax(Outputs);
+        double[] probs = Activations.SoftMax(Outputs);
+        // foreach (double x in probs) Debug.Log(x);
+        return probs;
     }
 }
-
-
-    // static int Main()
-    // {
-        
-    //     double[] inputs = [1, 2, 3, 4, 5];
-    //     int units = 5;
-
-    //     double[,] weights = new double[units, inputs.Length];
-
-    //     for (int i = 0; i < units; i++)
-    //     {
-    //         for (int j = 0; j < inputs.Length; j++)
-    //         {
-    //             weights[i, j] = new Random().NextDouble();
-    //         }
-    //     }
-
-    //     Layer test = new Layer(units, inputs.Length, Activations.ReLU);
-    //     test.SetValues(inputs);
-    //     test.SetWeights(weights);
-
-
-    //     Layer next = new Layer(units, inputs.Length, Activations.ReLU);
-
-
-
-    //     double[] output = test.Evaluate();
-    //     double[] probabilities = Activations.SoftMax(output);
-
-    //     foreach (var x in probabilities)
-    //     {
-    //         Console.WriteLine($"{x} ");
-    //     }
-
-    //     Console.Write($"{probabilities.Sum()}");
-
-        
-    //     return 0;
-    // }
-// }
-
-
-// class TestClass
-// {
-//     static int Main()
-//     {
-//         double[] inputs = new double[11];
-//         Array.Fill(inputs, 1);
-
-//         DecisionModel Model = new DecisionModel(11, 6);
-//         Random rng = new Random(21);
-
-
-//         double[,] FirstLayerWeights = new double[16,11];
-//         for (int i = 0; i < FirstLayerWeights.GetLength(0); i++)
-//         {
-//             for (int j = 0; j < FirstLayerWeights.GetLength(1); j++)
-//             {
-//                 FirstLayerWeights[i,j] = rng.NextDouble();
-//             }
-//         }
-
-//         Model.AddFirstLayer(16, Activations.ReLU, FirstLayerWeights);
-        
-//         double[,] secondlayerweights = new double[6,16];
-//         for (int i = 0; i < secondlayerweights.GetLength(0); i++)
-//         {
-//             for (int j = 0; j < secondlayerweights.GetLength(1); j++)
-//             {
-//                 secondlayerweights[i,j] = rng.NextDouble();
-//             }
-//         }
-
-//         Model.AddLayer(6, Activations.Linear, secondlayerweights);
-
-//         double[] output = Model.MakeDecision(inputs);
-
-//         foreach (var x in output)
-//         {
-//             Console.WriteLine(x);
-//         }
-
-
-//         return 0;
-//     }
-// }
