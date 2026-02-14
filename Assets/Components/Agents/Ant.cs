@@ -109,7 +109,7 @@ public class Ant : AbstractAnt
         if (Health <= 0)
         {
             if (DebugMessages) Debug.Log($"Ant {id} died");
-            Destroy(gameObject);
+            gameObject.SetActive(false);
         }
 
         // double MoveRoll = RNG.NextDouble();

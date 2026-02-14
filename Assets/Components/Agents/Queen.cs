@@ -18,7 +18,7 @@ public class Queen : Ant
         Health = 100;
         BuildCost = 33;
 
-        // Makes Queen only move sometimes so that other ants can catch up to her
+        // Makes Queen move relatively infrequently so that other ants can catch up to her and heal her
         ProbMoving = 0.25f;
     }
 
@@ -40,7 +40,7 @@ public class Queen : Ant
         }
         else
         {
-            DepositPheromones(10);
+            DepositPheromones(1);
         }
     }
 
@@ -64,7 +64,7 @@ public class Queen : Ant
         }
 
         // Queen deposits her own pheromone into the airblock above block she's standing on
-        DepositPheromones(50);
+        DepositPheromones(10);
     }
 
     void BuildNest()
@@ -92,6 +92,9 @@ public class Queen : Ant
 
         // Queen will deposit extra pheromones if she builds a nest block this tick
         DepositPheromones(500);
+
+        WorldManager.Instance.NumNestBlocks++;
+
         Move();
     }
 

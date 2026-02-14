@@ -20,9 +20,9 @@ namespace Antymology.Terrain
         /// </summary>
         private static bool _isVisible = false;
 
-        private static double MaxConcentration = 1000;
+        private static double MaxConcentration = 100;
 
-        private static double EvaporationRate = .95;
+        private static double EvaporationRate = .9;
 
         private static double DiffusionRate = 0.02;
 

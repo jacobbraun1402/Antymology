@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.PlayerLoop;
 
 namespace Antymology.Terrain
 {
@@ -25,9 +26,17 @@ namespace Antymology.Terrain
         public Material blockMaterial;
 
         // how often the simulation should update
-        public float timeBetweenTicks;
+        public readonly float timeBetweenTicks = 0.25f;
 
         public float TimeSinceLastUpdate;
+
+        public int ElapsedTicks;
+
+        public int Generation;
+
+        public int NumNestBlocks;
+
+        public readonly int TotalTicksPerGeneration = 10;
 
         public AbstractAnt[] Ants;
 
@@ -64,13 +73,52 @@ namespace Antymology.Terrain
         /// </summary>
         void Awake()
         {
+
+            ElapsedTicks = 0;
+
+            Generation = 1;
+
+            NumNestBlocks = 0;
+
+            InitWorld();
+            // TotalTicksPerGeneration = 10;
+            // // Generate new random number generator
+            // RNG = new System.Random(ConfigurationManager.Instance.Seed);
+
+            // // Generate new simplex noise generator
+            // SimplexNoise = new SimplexNoise(ConfigurationManager.Instance.Seed);
+
+            // ElapsedTicks = 0;
+
+            // Generation = 1;
+
+            // NumNestBlocks = 0;
+
+            // // Initialize a new 3D array of blocks with size of the number of chunks times the size of each chunk
+            // Blocks = new AbstractBlock[
+            //     ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter, //x
+            //     ConfigurationManager.Instance.World_Height * ConfigurationManager.Instance.Chunk_Diameter, // y
+            //     ConfigurationManager.Instance.World_Diameter * ConfigurationManager.Instance.Chunk_Diameter]; // z
+
+            // // Create list storing all ants and the queen
+            // Ants = new Ant[NumAnts+1];
+
+            // // BlocksWithPheromone = new();
+
+            // // Initialize a new 3D array of chunks with size of the number of chunks
+            // Chunks = new Chunk[
+            //     ConfigurationManager.Instance.World_Diameter,
+            //     ConfigurationManager.Instance.World_Height,
+            //     ConfigurationManager.Instance.World_Diameter];
+        }
+
+        private void InitWorld()
+        {
             // Generate new random number generator
             RNG = new System.Random(ConfigurationManager.Instance.Seed);
 
             // Generate new simplex noise generator
             SimplexNoise = new SimplexNoise(ConfigurationManager.Instance.Seed);
-
-            timeBetweenTicks = 0.5f;
 
             // Initialize a new 3D array of blocks with size of the number of chunks times the size of each chunk
             Blocks = new AbstractBlock[
@@ -87,7 +135,7 @@ namespace Antymology.Terrain
             Chunks = new Chunk[
                 ConfigurationManager.Instance.World_Diameter,
                 ConfigurationManager.Instance.World_Height,
-                ConfigurationManager.Instance.World_Diameter];
+                ConfigurationManager.Instance.World_Diameter];         
         }
 
         /// <summary>
@@ -218,6 +266,9 @@ namespace Antymology.Terrain
             Ants[NumAnts] = NewQueen;
         }
 
+        #endregion
+
+        #region Methods
         // At a given x and z coordinate, find the y coordinate of the first block that is below an air block
         public int FindFirstSolidBlock(int x, int z)
         {
@@ -267,11 +318,6 @@ namespace Antymology.Terrain
 
             return Result;
         }
-
-        #endregion
-
-        #region Methods
-
         /// <summary>
         /// Retrieves an abstract block type at the desired world coordinates.
         /// </summary>
@@ -577,6 +623,7 @@ namespace Antymology.Terrain
         }
 
         #endregion
+        
 
         #region Chunks
 
@@ -586,6 +633,7 @@ namespace Antymology.Terrain
         private void GenerateChunks()
         {
             GameObject chunkObg = new GameObject("Chunks");
+            chunkObg.tag = "Chunk";
 
             for (int x = 0; x < Chunks.GetLength(0); x++)
                 for (int z = 0; z < Chunks.GetLength(2); z++)
@@ -612,15 +660,61 @@ namespace Antymology.Terrain
         #endregion
 
         #endregion
+
+        #region Updates
+
+        // Called after the ants do their updates so that air blocks have most
+        // up to date pheromone concentrations, and if we're resetting, we do so after
+        // the ants finished their last update
         void LateUpdate()
         {
-            TimeSinceLastUpdate += Time.deltaTime;
-            if (TimeSinceLastUpdate >= timeBetweenTicks)
+            if (ElapsedTicks < TotalTicksPerGeneration)
             {
-                TimeSinceLastUpdate -= timeBetweenTicks;
-                DiffusePheromones();
-                // EvaporatePheromones();
-            } 
+                TimeSinceLastUpdate += Time.deltaTime;
+                if (TimeSinceLastUpdate >= timeBetweenTicks)
+                {
+                    TimeSinceLastUpdate -= timeBetweenTicks;
+                    DiffusePheromones();
+                    ElapsedTicks++;
+                    UIManager.Instance.UpdateText(NumNestBlocks, Generation, ElapsedTicks);
+                } 
+            }
+            else
+            {
+                ResetWorld();
+            }
+        }
+
+        void ResetWorld()
+        {
+            GameObject[] Chunks = GameObject.FindGameObjectsWithTag("Chunk");
+            for (int i = Chunks.GetLength(0)-1; i >= 0; i--)
+            {
+                Destroy(Chunks[i]);
+            }
+
+            foreach (AbstractAnt A in Ants)
+            {
+                A.gameObject.SetActive(true);
+            }
+
+            List<List<double[,]>> NextGenModelWeights = EvolutionaryStrategy.MakeNextGen(Ants);
+
+            foreach (AbstractAnt A in Ants)
+            {
+                Destroy(A.gameObject);
+            }
+
+            ElapsedTicks = 0;
+            Generation++;
+            NumNestBlocks = 0;
+
+            InitWorld();
+
+            GenerateData();
+            GenerateChunks();
+
+            GenerateAnts(NextGenModelWeights);
         }
 
         void DiffusePheromones()
@@ -646,39 +740,6 @@ namespace Antymology.Terrain
             }
         }
 
-        // void DiffusePheromones()
-        // {
-        //     HashSet<AirBlock> ToUpdate = new HashSet<AirBlock>(BlocksWithPheromone);
-        //     foreach (AirBlock B in ToUpdate)
-        //     {
-        //         int x = B.worldXCoordinate, y = B.worldYCoordinate, z=B.worldZCoordinate;
-        //         if (x >= 0 && y >= 0 && z >= 0)
-        //         {
-        //             List<AirBlock> neighbours = GetNeighbouringAirBlocks(x, y, z);
-        //             B.Diffuse(neighbours);
-        //             B.Evaporate();
-        //         }
-                
-        //     }
-        // }
-
-        // void EvaporatePheromones()
-        // {
-        //     for (int x = 0; x < Blocks.GetLength(0); x++)
-        //     {
-        //         for (int y = 0; y < Blocks.GetLength(1); y++)
-        //         {
-        //             for (int z = 0; z < Blocks.GetLength(2); z++)
-        //             {
-        //                 AbstractBlock block = GetBlock(x, y, z);
-        //                 if (block is AirBlock air)
-        //                 {
-                            
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
 
         List<AirBlock> GetNeighbouringAirBlocks(int x, int y, int z)
         {
@@ -702,5 +763,8 @@ namespace Antymology.Terrain
             }
             return Result;
         }
+
+    #endregion
     }
+    
 }

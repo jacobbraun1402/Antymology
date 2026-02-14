@@ -22,7 +22,7 @@ public abstract class AbstractAnt : MonoBehaviour
 
     protected System.Random RNG;
 
-    public int HealthDecayRate = 2;
+    public int HealthDecayRate = 1;
 
     public bool UpdateNeeded;
 
